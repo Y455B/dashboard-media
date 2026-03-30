@@ -191,6 +191,13 @@ tr:hover td{background:var(--s2)}
 .et{font-size:14px;margin-bottom:.4rem}
 .es{font-family:var(--mono);font-size:12px;color:var(--t3)}
 
+@media print{
+  .side,.ph-r,button,.mf{display:none!important}
+  .page{padding:0!important}
+  body{background:#fff;color:#000}
+  .card,.cc,.modal{border:1px solid #ddd;border-radius:4px}
+  th,td{border-bottom:1px solid #eee}
+}
 @media(max-width:768px){
   .shell{grid-template-columns:1fr}
   .side{display:none}
@@ -200,6 +207,7 @@ tr:hover td{background:var(--s2)}
   .cc-stats{grid-template-columns:1fr 1fr}
 }
 </style>
+<script src="https://cdn.jsdelivr.net/npm/xlsx@0.18.5/dist/xlsx.full.min.js"></script>
 </head>
 <body>
 
@@ -247,6 +255,7 @@ tr:hover td{background:var(--s2)}
     <div class="ni" id="ni-conso"   onclick="nav('conso')"><svg viewBox="0 0 16 16" fill="none" stroke="currentColor" stroke-width="1.5"><circle cx="8" cy="8" r="6"/><path d="M8 5v3.5l2.5 1.5"/></svg>Consos live</div>
     <div class="ns">Gestion</div>
     <div class="ni" id="ni-budgets" onclick="nav('budgets')"><svg viewBox="0 0 16 16" fill="none" stroke="currentColor" stroke-width="1.5"><rect x="1" y="3" width="14" height="10" rx="1.5"/><path d="M1 6h14"/></svg>Dossiers budget</div>
+    <div class="ni" id="ni-plans"   onclick="nav('plans')"><svg viewBox="0 0 16 16" fill="none" stroke="currentColor" stroke-width="1.5"><rect x="2" y="2" width="12" height="3" rx="1"/><rect x="2" y="7" width="8" height="2" rx="1"/><rect x="2" y="11" width="10" height="2" rx="1"/></svg>Plans média</div>
     <div class="ni" id="ni-history" onclick="nav('history')"><svg viewBox="0 0 16 16" fill="none" stroke="currentColor" stroke-width="1.5"><path d="M2 8h12M8 2l6 6-6 6"/></svg>Historique</div>
     <div class="side-bot">
       <div class="side-user" id="sideUser"></div>
@@ -326,6 +335,18 @@ tr:hover td{background:var(--s2)}
           <th>Groupe</th><th>Client</th><th>Canal</th><th>Période</th><th>Devis</th><th>Frais</th><th>Net carte</th><th>Consommé</th><th>Solde</th><th>Statut</th><th></th>
         </tr></thead><tbody id="budTb"></tbody></table></div>
       </div>
+    </div>
+
+    <!-- PLANS MEDIA -->
+    <div class="page" id="P_plans">
+      <div class="ph">
+        <div class="ph-l"><h1>Plans média</h1><p>Création, suivi et export des plans média clients</p></div>
+        <div class="ph-r">
+          <select id="planGF" onchange="renderPlans()" style="width:150px"><option value="all">Tous groupes</option></select>
+          <button class="btn btn-acc" id="btnAddPlan" onclick="openPlanModal()">+ Plan média</button>
+        </div>
+      </div>
+      <div id="plansList"></div>
     </div>
 
     <!-- HISTORIQUE -->
@@ -433,6 +454,59 @@ tr:hover td{background:var(--s2)}
   </div>
 </div>
 
+<!-- MODAL: Plan média -->
+<div class="ov" id="M_plan">
+  <div class="modal" style="max-width:680px">
+    <div class="mh"><h3 id="mPlanT">Nouveau plan média</h3><button class="mhc" onclick="closeM('M_plan')">×</button></div>
+    <div class="mb">
+      <div class="fg">
+        <div class="frow"><label>Groupe</label><select id="fPlanG" onchange="updatePlanClients()"></select></div>
+        <div class="frow"><label>Client</label><select id="fPlanC"></select></div>
+        <div class="frow"><label>Période</label><input id="fPlanPer" placeholder="Mai 2025, Q2 2025…"/></div>
+        <div class="frow"><label>Budget global (DH)</label><input type="number" id="fPlanBudget" placeholder="200 000" oninput="updatePlanTotal()"/></div>
+        <div class="frow"><label>Dossier budget lié (optionnel)</label>
+          <select id="fPlanBud"><option value="">— Aucun —</option></select>
+        </div>
+        <div class="fc frow"><label>Notes / recommandations stratégiques</label>
+          <textarea id="fPlanNotes" rows="3" placeholder="Objectifs campagne, contexte, recommandations…" style="resize:vertical"></textarea>
+        </div>
+      </div>
+      <div style="display:flex;align-items:center;justify-content:space-between;margin:1rem 0 .75rem">
+        <div style="font-family:var(--mono);font-size:11px;color:var(--t2);text-transform:uppercase;letter-spacing:.08em">Lignes du plan</div>
+        <button class="btn btn-xs btn-ghost" onclick="addPlanLine()">+ Ligne</button>
+      </div>
+      <div style="background:var(--s2);border-radius:var(--r);overflow:hidden;margin-bottom:.75rem">
+        <table style="width:100%;border-collapse:collapse" id="planLinesTable">
+          <thead><tr>
+            <th style="padding:7px 10px;font-family:var(--mono);font-size:10px;color:var(--t3);text-align:left;border-bottom:1px solid var(--b1);letter-spacing:.08em">CANAL</th>
+            <th style="padding:7px 10px;font-family:var(--mono);font-size:10px;color:var(--t3);text-align:left;border-bottom:1px solid var(--b1);letter-spacing:.08em">BUDGET (DH)</th>
+            <th style="padding:7px 10px;font-family:var(--mono);font-size:10px;color:var(--t3);text-align:left;border-bottom:1px solid var(--b1);letter-spacing:.08em">OBJECTIF</th>
+            <th style="padding:7px 10px;font-family:var(--mono);font-size:10px;color:var(--t3);text-align:left;border-bottom:1px solid var(--b1);letter-spacing:.08em">KPI CIBLE</th>
+            <th style="padding:7px 10px;font-family:var(--mono);font-size:10px;color:var(--t3);text-align:left;border-bottom:1px solid var(--b1);letter-spacing:.08em">CIBLAGE / AUDIENCE</th>
+            <th style="padding:7px 10px;border-bottom:1px solid var(--b1)"></th>
+          </tr></thead>
+          <tbody id="planLinesTbody"></tbody>
+        </table>
+      </div>
+      <div class="calc-box" id="planTotalBox">Ajoute des lignes pour voir la répartition</div>
+    </div>
+    <div class="mf"><button class="btn btn-ghost" onclick="closeM('M_plan')">Annuler</button><button class="btn btn-acc" onclick="savePlan()">Enregistrer</button></div>
+  </div>
+</div>
+
+<!-- MODAL: Plan export preview -->
+<div class="ov" id="M_planView">
+  <div class="modal" style="max-width:760px">
+    <div class="mh"><h3 id="mViewT">Plan média</h3><button class="mhc" onclick="closeM('M_planView')">×</button></div>
+    <div class="mb" id="mViewBody"></div>
+    <div class="mf">
+      <button class="btn btn-ghost" onclick="closeM('M_planView')">Fermer</button>
+      <button class="btn btn-ghost" onclick="exportPlanPDF()">Exporter PDF</button>
+      <button class="btn btn-acc" onclick="exportPlanXLSX()">Exporter Excel</button>
+    </div>
+  </div>
+</div>
+
 <!-- MODAL: Delete -->
 <div class="ov" id="M_del">
   <div class="modal">
@@ -451,7 +525,7 @@ const SO=['attente','incoming','approvisionne','encours','fini'];
 const SK='declic_mt_v4';
 
 let role='',user='';
-let db={groups:[],budgets:[],history:[]};
+let db={groups:[],budgets:[],history:[],plans:[]};
 let eGrpId=null,eBudId=null,pDelType=null,pDelId=null,pStatusId=null,pConsoId=null;
 let selColor=COLORS[0];
 
@@ -463,7 +537,7 @@ async function load(){
     const r=await fetch('/api/db?action=get&key='+REDIS_KEY);
     if(!r.ok) throw new Error('HTTP '+r.status);
     const data=await r.json();
-    if(data.value) db=data.value;
+    if(data.value){db=data.value;if(!db.plans)db.plans=[];}
     setRedisStatus(true);
   }catch(e){
     console.warn('Redis load failed',e);
@@ -536,6 +610,7 @@ function setupUI(){
   b.textContent={admin:'Admin',traffic:'Traffic',finance:'Finance'}[role];
   document.getElementById('sideUser').textContent=user;
   document.getElementById('btnAddBud').style.display=canEdit()?'':'none';
+  document.getElementById('btnAddPlan').style.display=canEdit()?'':'none';
   document.getElementById('grpActions').innerHTML=isAdmin()?'<button class="btn btn-acc" onclick="openGrpModal()">+ Groupe</button>':'';
   document.getElementById('dashDate').textContent=new Date().toLocaleDateString('fr-FR',{weekday:'long',year:'numeric',month:'long',day:'numeric'});
   buildColorPick();
@@ -557,7 +632,7 @@ function nav(name){
   document.querySelectorAll('.page').forEach(p=>p.classList.remove('on'));
   document.getElementById('ni-'+name).classList.add('on');
   document.getElementById('P_'+name).classList.add('on');
-  ({dash:renderDash,groups:renderGroups,conso:renderConso,budgets:renderBudgets,history:renderHistory})[name]?.();
+  ({dash:renderDash,groups:renderGroups,conso:renderConso,budgets:renderBudgets,plans:renderPlans,history:renderHistory})[name]?.();
 }
 
 function renderAll(){populateF();renderDash();}
@@ -575,7 +650,7 @@ function domSt(bs){for(const s of['encours','approvisionne','incoming','attente'
 function populateF(){
   const gs=db.groups;
   const o=`<option value="all">Tous les groupes</option>`+gs.map(g=>`<option value="${g.id}">${g.name}</option>`).join('');
-  ['dashGF','budGF','consoGF','histGF'].forEach(id=>{const el=document.getElementById(id);if(!el)return;const v=el.value;el.innerHTML=o;if(v)el.value=v;});
+  ['dashGF','budGF','consoGF','histGF','planGF'].forEach(id=>{const el=document.getElementById(id);if(!el)return;const v=el.value;el.innerHTML=o;if(v)el.value=v;});
 }
 
 function calcNet(){
@@ -879,7 +954,8 @@ function askDel(type,id){
   pDelType=type;pDelId=id;
   const msgs={
     group:()=>{const g=db.groups.find(x=>x.id===id);return`Supprimer le groupe "${g?.name}" ? Tous les dossiers liés seront supprimés.`;},
-    budget:()=>{const b=db.budgets.find(x=>x.id===id);return`Supprimer le dossier "${b?.client} — ${b?.canal}" ?`;}
+    budget:()=>{const b=db.budgets.find(x=>x.id===id);return`Supprimer le dossier "${b?.client} — ${b?.canal}" ?`;},
+    plan:()=>{const p=db.plans.find(x=>x.id===id);return`Supprimer le plan média "${p?.client} — ${p?.period}" ?`;}
   };
   document.getElementById('mDelDesc').textContent=msgs[type]();
   openM('M_del');
@@ -894,8 +970,271 @@ function confirmDel(){
     const b=db.budgets.find(x=>x.id===pDelId);
     log({type:'st',grp:gName(b?.groupId),client:b?.client,desc:'Dossier supprimé'});
     db.budgets=db.budgets.filter(x=>x.id!==pDelId);
+  }else if(pDelType==='plan'){
+    const p=db.plans.find(x=>x.id===pDelId);
+    log({type:'st',grp:gName(p?.groupId),client:p?.client,desc:'Plan média supprimé'});
+    db.plans=db.plans.filter(x=>x.id!==pDelId);
   }
   save();closeM('M_del');populateF();renderGroups();renderBudgets();renderDash();
+}
+
+
+// ── PLAN MEDIA ─────────────────────────────────────────────────────────
+let ePlanId=null;
+let planLines=[];
+
+function renderPlans(){
+  populateF();
+  const gf=document.getElementById('planGF').value;
+  let plans=db.plans||[];
+  if(gf!=='all')plans=plans.filter(p=>p.groupId===gf);
+  const el=document.getElementById('plansList');
+  if(!plans.length){
+    el.innerHTML=`<div class="empty"><div class="ei">▤</div><div class="et">Aucun plan média</div><div class="es">Crée un plan via le bouton + Plan média</div></div>`;
+    return;
+  }
+  el.innerHTML=plans.map(p=>{
+    const total=p.lines.reduce((s,l)=>s+l.budget,0);
+    const alloc=p.budget>0?Math.min(Math.round(total/p.budget*100),100):0;
+    const eb=canEdit()?`<button class="btn btn-xs btn-ghost" onclick="openPlanModal('${p.id}')">Modifier</button>`:'';
+    const db2=isAdmin()?`<button class="btn btn-xs btn-red" onclick="askDel('plan','${p.id}')">✕</button>`:'';
+    return `<div class="card" style="margin-bottom:1rem">
+      <div style="display:flex;align-items:center;justify-content:space-between;padding:1rem 1.25rem;border-bottom:1px solid var(--b1);gap:1rem;flex-wrap:wrap">
+        <div>
+          <div style="font-size:14px;font-weight:500;display:flex;align-items:center">${dot(p.groupId)}${p.client} — ${p.period||'—'}</div>
+          <div style="font-family:var(--mono);font-size:11px;color:var(--t2);margin-top:3px">${gName(p.groupId)} · Budget global : ${fmt(p.budget)} · ${p.lines.length} ligne(s)</div>
+        </div>
+        <div style="display:flex;gap:6px;align-items:center">
+          ${eb}${db2}
+          <button class="btn btn-xs btn-acc" onclick="openPlanView('${p.id}')">Voir / Exporter</button>
+        </div>
+      </div>
+      <div class="tw">
+        <table><thead><tr>
+          <th>Canal</th><th>Budget</th><th>% du global</th><th>Objectif</th><th>KPI cible</th><th>Ciblage</th>
+        </tr></thead>
+        <tbody>${p.lines.map(l=>{
+          const lp=p.budget>0?Math.round(l.budget/p.budget*100):0;
+          return `<tr>
+            <td style="font-weight:500">${l.canal}</td>
+            <td class="mono" style="color:var(--acc)">${fmt(l.budget)}</td>
+            <td><div style="display:flex;align-items:center;gap:8px"><div class="prg" style="width:80px"><div class="prg-f" style="width:${lp}%;background:var(--acc)"></div></div><span class="mono tdim" style="font-size:11px">${lp}%</span></div></td>
+            <td class="dim">${l.objectif||'—'}</td>
+            <td class="mono tdim">${l.kpi||'—'}</td>
+            <td class="dim">${l.ciblage||'—'}</td>
+          </tr>`;
+        }).join('')}</tbody></table>
+      </div>
+      ${p.notes?`<div style="padding:.875rem 1.25rem;border-top:1px solid var(--b1);font-size:12px;color:var(--t2)"><span style="font-family:var(--mono);font-size:10px;color:var(--t3);text-transform:uppercase;letter-spacing:.08em;margin-right:8px">Notes</span>${p.notes}</div>`:''}
+    </div>`;
+  }).join('');
+}
+
+function openPlanModal(id){
+  ePlanId=id||null;
+  planLines=[];
+  document.getElementById('mPlanT').textContent=id?'Modifier le plan':'Nouveau plan média';
+  const gs=document.getElementById('fPlanG');
+  gs.innerHTML=db.groups.map(g=>`<option value="${g.id}">${g.name}</option>`).join('');
+  updatePlanClients();
+  // populate linked budget select
+  const bs=document.getElementById('fPlanBud');
+  bs.innerHTML=`<option value="">— Aucun —</option>`+db.budgets.map(b=>`<option value="${b.id}">${b.client} — ${b.canal} (${b.period||'—'})</option>`).join('');
+  if(id){
+    const p=db.plans.find(x=>x.id===id);
+    gs.value=p.groupId;updatePlanClients();
+    document.getElementById('fPlanC').value=p.client;
+    document.getElementById('fPlanPer').value=p.period||'';
+    document.getElementById('fPlanBudget').value=p.budget;
+    document.getElementById('fPlanBud').value=p.budgetId||'';
+    document.getElementById('fPlanNotes').value=p.notes||'';
+    planLines=[...p.lines.map(l=>({...l}))];
+  }else{
+    ['fPlanPer','fPlanNotes'].forEach(x=>document.getElementById(x).value='');
+    document.getElementById('fPlanBudget').value='';
+    document.getElementById('fPlanBud').value='';
+    planLines=[];
+  }
+  renderPlanLines();
+  openM('M_plan');
+}
+
+function updatePlanClients(){
+  const gid=document.getElementById('fPlanG').value;
+  const g=db.groups.find(x=>x.id===gid);
+  document.getElementById('fPlanC').innerHTML=(g?g.clients:[]).map(c=>`<option value="${c}">${c}</option>`).join('');
+}
+
+function addPlanLine(){
+  planLines.push({canal:'Meta Ads',budget:0,objectif:'',kpi:'',ciblage:''});
+  renderPlanLines();
+}
+
+function removePlanLine(i){
+  planLines.splice(i,1);
+  renderPlanLines();
+}
+
+const CANALS=['Meta Ads','Google Ads','TikTok Ads','LinkedIn Ads','Programmatique','Influence','Multi-canal','Autre'];
+
+function renderPlanLines(){
+  const tbody=document.getElementById('planLinesTbody');
+  tbody.innerHTML=planLines.map((l,i)=>`<tr>
+    <td style="padding:6px 8px"><select onchange="planLines[${i}].canal=this.value" style="width:130px;padding:5px 8px;font-size:12px">${CANALS.map(c=>`<option value="${c}" ${l.canal===c?'selected':''}>${c}</option>`).join('')}</select></td>
+    <td style="padding:6px 8px"><input type="number" value="${l.budget||''}" placeholder="0" oninput="planLines[${i}].budget=parseFloat(this.value)||0;updatePlanTotal()" style="width:110px;padding:5px 8px;font-size:12px"/></td>
+    <td style="padding:6px 8px"><input type="text" value="${l.objectif||''}" placeholder="Notoriété, trafic…" oninput="planLines[${i}].objectif=this.value" style="width:130px;padding:5px 8px;font-size:12px"/></td>
+    <td style="padding:6px 8px"><input type="text" value="${l.kpi||''}" placeholder="CPM 15 DH, CTR 2%…" oninput="planLines[${i}].kpi=this.value" style="width:130px;padding:5px 8px;font-size:12px"/></td>
+    <td style="padding:6px 8px"><input type="text" value="${l.ciblage||''}" placeholder="18-35 ans, Casablanca…" oninput="planLines[${i}].ciblage=this.value" style="width:160px;padding:5px 8px;font-size:12px"/></td>
+    <td style="padding:6px 8px"><button class="btn btn-xs btn-red" onclick="removePlanLine(${i})">✕</button></td>
+  </tr>`).join('');
+  updatePlanTotal();
+}
+
+function updatePlanTotal(){
+  const budget=parseFloat(document.getElementById('fPlanBudget').value)||0;
+  const total=planLines.reduce((s,l)=>s+l.budget,0);
+  const reste=budget-total;
+  const box=document.getElementById('planTotalBox');
+  if(!planLines.length){box.textContent='Ajoute des lignes pour voir la répartition';return;}
+  box.innerHTML=`Budget global : <strong>${fmt(budget)}</strong> &nbsp;|&nbsp; Alloué : <strong style="color:var(--acc)">${fmt(total)}</strong> &nbsp;|&nbsp; Reste : <strong style="color:${reste<0?'var(--red)':'var(--grn)'}">${fmt(reste)}</strong>`;
+}
+
+function savePlan(){
+  const groupId=document.getElementById('fPlanG').value;
+  const client=document.getElementById('fPlanC').value;
+  const period=document.getElementById('fPlanPer').value;
+  const budget=parseFloat(document.getElementById('fPlanBudget').value)||0;
+  const budgetId=document.getElementById('fPlanBud').value;
+  const notes=document.getElementById('fPlanNotes').value;
+  if(!groupId||!client)return alert('Groupe et client requis');
+  if(!planLines.length)return alert('Ajoute au moins une ligne');
+  const plan={id:ePlanId||uid(),groupId,client,period,budget,budgetId,notes,lines:planLines.map(l=>({...l})),createdAt:ePlanId?(db.plans.find(x=>x.id===ePlanId)?.createdAt||now()):now()};
+  if(ePlanId){const idx=db.plans.findIndex(x=>x.id===ePlanId);db.plans[idx]=plan;}
+  else{db.plans.push(plan);}
+  log({type:'nw',grp:gName(groupId),client,desc:`Plan média ${ePlanId?'modifié':'créé'} — ${period} — ${planLines.length} ligne(s)`});
+  save();closeM('M_plan');renderPlans();
+}
+
+// ── PLAN VIEW / EXPORT ─────────────────────────────────────────────────
+function openPlanView(id){
+  const p=db.plans.find(x=>x.id===id);
+  if(!p)return;
+  document.getElementById('mViewT').textContent=`Plan média — ${p.client} — ${p.period||'—'}`;
+  const total=p.lines.reduce((s,l)=>s+l.budget,0);
+  document.getElementById('mViewBody').innerHTML=`
+    <div style="display:grid;grid-template-columns:1fr 1fr 1fr;gap:10px;margin-bottom:1.25rem">
+      <div class="cs"><div class="cs-l">Client</div><div style="font-size:13px;font-weight:500">${p.client}</div></div>
+      <div class="cs"><div class="cs-l">Groupe</div><div style="font-size:13px">${gName(p.groupId)}</div></div>
+      <div class="cs"><div class="cs-l">Période</div><div style="font-size:13px">${p.period||'—'}</div></div>
+      <div class="cs"><div class="cs-l">Budget global</div><div class="cs-v" style="color:var(--acc)">${fmt(p.budget)}</div></div>
+      <div class="cs"><div class="cs-l">Total alloué</div><div class="cs-v" style="color:var(--grn)">${fmt(total)}</div></div>
+      <div class="cs"><div class="cs-l">Reste</div><div class="cs-v" style="color:${p.budget-total<0?'var(--red)':'var(--blu)'}">${fmt(p.budget-total)}</div></div>
+    </div>
+    ${p.notes?`<div style="background:var(--s2);border-radius:var(--r);padding:.875rem;margin-bottom:1.25rem;font-size:13px;color:var(--t2)"><span style="font-family:var(--mono);font-size:10px;color:var(--t3);text-transform:uppercase;letter-spacing:.08em;display:block;margin-bottom:4px">Notes stratégiques</span>${p.notes}</div>`:''}
+    <div class="tw"><table style="width:100%;border-collapse:collapse">
+      <thead><tr>
+        <th style="padding:8px;font-family:var(--mono);font-size:10px;color:var(--t3);text-align:left;border-bottom:1px solid var(--b1)">CANAL</th>
+        <th style="padding:8px;font-family:var(--mono);font-size:10px;color:var(--t3);text-align:left;border-bottom:1px solid var(--b1)">BUDGET</th>
+        <th style="padding:8px;font-family:var(--mono);font-size:10px;color:var(--t3);text-align:left;border-bottom:1px solid var(--b1)">%</th>
+        <th style="padding:8px;font-family:var(--mono);font-size:10px;color:var(--t3);text-align:left;border-bottom:1px solid var(--b1)">OBJECTIF</th>
+        <th style="padding:8px;font-family:var(--mono);font-size:10px;color:var(--t3);text-align:left;border-bottom:1px solid var(--b1)">KPI CIBLE</th>
+        <th style="padding:8px;font-family:var(--mono);font-size:10px;color:var(--t3);text-align:left;border-bottom:1px solid var(--b1)">CIBLAGE</th>
+      </tr></thead>
+      <tbody>${p.lines.map(l=>{
+        const lp=p.budget>0?Math.round(l.budget/p.budget*100):0;
+        return`<tr>
+          <td style="padding:9px 8px;border-bottom:1px solid var(--b1);font-weight:500">${l.canal}</td>
+          <td style="padding:9px 8px;border-bottom:1px solid var(--b1);font-family:var(--mono);font-size:12px;color:var(--acc)">${fmt(l.budget)}</td>
+          <td style="padding:9px 8px;border-bottom:1px solid var(--b1);font-family:var(--mono);font-size:12px;color:var(--t2)">${lp}%</td>
+          <td style="padding:9px 8px;border-bottom:1px solid var(--b1);font-size:12px;color:var(--t2)">${l.objectif||'—'}</td>
+          <td style="padding:9px 8px;border-bottom:1px solid var(--b1);font-family:var(--mono);font-size:12px;color:var(--t2)">${l.kpi||'—'}</td>
+          <td style="padding:9px 8px;border-bottom:1px solid var(--b1);font-size:12px;color:var(--t2)">${l.ciblage||'—'}</td>
+        </tr>`;
+      }).join('')}</tbody>
+    </table></div>
+    <div style="font-family:var(--mono);font-size:10px;color:var(--t3);margin-top:1rem;text-align:right">Généré le ${new Date().toLocaleDateString('fr-FR')} · Déclic Media Tracker</div>
+  `;
+  document.getElementById('mViewBody').dataset.planId=id;
+  openM('M_planView');
+}
+
+function exportPlanXLSX(){
+  const id=document.getElementById('mViewBody').dataset.planId;
+  const p=db.plans.find(x=>x.id===id);
+  if(!p||typeof XLSX==='undefined'){alert('SheetJS non chargé');return;}
+  const wb=XLSX.utils.book_new();
+  // Sheet 1: infos générales
+  const info=[
+    ['Plan Média — '+p.client,''],
+    ['Groupe',gName(p.groupId)],
+    ['Client',p.client],
+    ['Période',p.period||''],
+    ['Budget global (DH)',p.budget],
+    ['Total alloué (DH)',p.lines.reduce((s,l)=>s+l.budget,0)],
+    ['Notes stratégiques',p.notes||''],
+    ['Généré le',new Date().toLocaleDateString('fr-FR')],
+  ];
+  const ws1=XLSX.utils.aoa_to_sheet(info);
+  ws1['!cols']=[{wch:28},{wch:40}];
+  XLSX.utils.book_append_sheet(wb,ws1,'Infos');
+  // Sheet 2: lignes plan
+  const rows=[['Canal','Budget (DH)','% du global','Objectif','KPI Cible','Ciblage / Audience']];
+  p.lines.forEach(l=>{
+    const lp=p.budget>0?Math.round(l.budget/p.budget*100):0;
+    rows.push([l.canal,l.budget,lp+'%',l.objectif||'',l.kpi||'',l.ciblage||'']);
+  });
+  rows.push(['TOTAL',p.lines.reduce((s,l)=>s+l.budget,0),'','','','']);
+  const ws2=XLSX.utils.aoa_to_sheet(rows);
+  ws2['!cols']=[{wch:18},{wch:16},{wch:12},{wch:20},{wch:18},{wch:28}];
+  XLSX.utils.book_append_sheet(wb,ws2,'Plan média');
+  XLSX.writeFile(wb,`Plan_media_${p.client}_${p.period||'export'}.xlsx`.replace(/\s/g,'_'));
+}
+
+function exportPlanPDF(){
+  const id=document.getElementById('mViewBody').dataset.planId;
+  const p=db.plans.find(x=>x.id===id);
+  if(!p)return;
+  const w=window.open('','_blank');
+  const total=p.lines.reduce((s,l)=>s+l.budget,0);
+  w.document.write(`<!DOCTYPE html><html><head><meta charset="UTF-8"/><title>Plan média — ${p.client}</title>
+  <style>
+    *{box-sizing:border-box;margin:0;padding:0}
+    body{font-family:Arial,sans-serif;font-size:12px;color:#1a1a1a;padding:2rem}
+    h1{font-size:18px;font-weight:700;margin-bottom:.25rem}
+    .sub{font-size:12px;color:#666;margin-bottom:1.5rem}
+    .meta{display:grid;grid-template-columns:repeat(3,1fr);gap:10px;margin-bottom:1.5rem}
+    .meta-box{background:#f5f5f5;border-radius:6px;padding:.75rem}
+    .meta-box .lbl{font-size:10px;color:#888;text-transform:uppercase;letter-spacing:.06em;margin-bottom:3px}
+    .meta-box .val{font-size:14px;font-weight:600}
+    .notes{background:#fffbf0;border:1px solid #f0e0a0;border-radius:6px;padding:.875rem;margin-bottom:1.5rem;font-size:12px;color:#555}
+    .notes .lbl{font-size:10px;color:#999;text-transform:uppercase;letter-spacing:.06em;display:block;margin-bottom:4px}
+    table{width:100%;border-collapse:collapse}
+    th{background:#f5f5f5;padding:8px 10px;text-align:left;font-size:10px;text-transform:uppercase;letter-spacing:.06em;color:#666;border-bottom:2px solid #ddd}
+    td{padding:9px 10px;border-bottom:1px solid #eee;font-size:12px}
+    tr:last-child td{border-bottom:none}
+    .total td{font-weight:700;background:#f9f9f9;border-top:2px solid #ddd}
+    .footer{margin-top:2rem;font-size:10px;color:#aaa;text-align:right}
+    @media print{body{padding:1rem}}
+  </style></head><body>
+  <h1>Plan Média — ${p.client}</h1>
+  <div class="sub">${gName(p.groupId)} · ${p.period||'—'} · Généré le ${new Date().toLocaleDateString('fr-FR')}</div>
+  <div class="meta">
+    <div class="meta-box"><div class="lbl">Budget global</div><div class="val">${p.budget.toLocaleString('fr-MA')} DH</div></div>
+    <div class="meta-box"><div class="lbl">Total alloué</div><div class="val">${total.toLocaleString('fr-MA')} DH</div></div>
+    <div class="meta-box"><div class="lbl">Reste</div><div class="val">${(p.budget-total).toLocaleString('fr-MA')} DH</div></div>
+  </div>
+  ${p.notes?`<div class="notes"><span class="lbl">Notes stratégiques</span>${p.notes}</div>`:''}
+  <table>
+    <thead><tr><th>Canal</th><th>Budget (DH)</th><th>%</th><th>Objectif</th><th>KPI Cible</th><th>Ciblage</th></tr></thead>
+    <tbody>
+      ${p.lines.map(l=>`<tr><td><strong>${l.canal}</strong></td><td>${l.budget.toLocaleString('fr-MA')} DH</td><td>${p.budget>0?Math.round(l.budget/p.budget*100):0}%</td><td>${l.objectif||'—'}</td><td>${l.kpi||'—'}</td><td>${l.ciblage||'—'}</td></tr>`).join('')}
+      <tr class="total"><td>TOTAL</td><td>${total.toLocaleString('fr-MA')} DH</td><td>100%</td><td></td><td></td><td></td></tr>
+    </tbody>
+  </table>
+  <div class="footer">Déclic Media Tracker · dashboard-media-orcin.vercel.app</div>
+  <script>window.onload=function(){window.print();}<\/script>
+  </body></html>`);
+  w.document.close();
 }
 
 function openM(id){document.getElementById(id).classList.add('on');}
