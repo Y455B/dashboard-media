@@ -367,20 +367,14 @@ tr:hover td{background:var(--s2)}
     <!-- CARTE PARTENAIRE -->
     <div class="page" id="P_carte">
       <div class="ph">
-        <div class="ph-l"><h1>Carte partenaire</h1><p>Suivi des débits carte en temps réel</p></div>
+        <div class="ph-l"><h1>Carte partenaire</h1><p>Enveloppes & débits carte</p></div>
         <div class="ph-r">
-          <button class="btn btn-acc" id="btnAddCarte" onclick="openCarteModal()">+ Débit carte</button>
+          <button class="btn btn-ghost" id="btnAddEnv" onclick="openEnvModal()">+ Enveloppe</button>
+          <button class="btn btn-acc" id="btnAddCarte" onclick="openCarteModal()">+ Débit</button>
         </div>
       </div>
       <div class="kpi-row" id="carteKpis"></div>
-      <div class="card">
-        <div class="tbl-wrap">
-          <table><thead><tr>
-            <th>Date</th><th>Client / Dossier</th><th>USDT</th><th>Montant (USDT)</th><th>Note</th><th>Saisi par</th><th></th>
-          </tr></thead>
-          <tbody id="carteTbody"></tbody>
-        </table></div>
-      </div>
+      <div id="carteEnvList"></div>
     </div>
 
     <!-- HISTORIQUE -->
@@ -617,11 +611,47 @@ tr:hover td{background:var(--s2)}
   </div>
 </div>
 
+<!-- MODAL: Enveloppe carte -->
+<div class="ov" id="M_env">
+  <div class="modal">
+    <div class="mh"><h3>Nouvelle enveloppe</h3><button class="mhc" onclick="closeM('M_env')">×</button></div>
+    <div class="mb">
+      <div class="fg">
+        <div class="frow"><label>Date d'appro</label>
+          <input type="date" id="fEnvDate"/>
+        </div>
+        <div class="frow"><label>Montant approvisionné (USDT)</label>
+          <input type="number" id="fEnvUSDT" placeholder="50 000" oninput="calcEnvMAD()"/>
+        </div>
+        <div class="frow"><label>Taux de change (MAD/USDT)</label>
+          <input type="number" id="fEnvTaux" placeholder="10.8" step="0.01" value="10.8" oninput="calcEnvMAD()"/>
+        </div>
+        <div class="frow"><label>Équivalent (MAD)</label>
+          <input type="number" id="fEnvMAD" placeholder="calculé auto" readonly style="opacity:.6"/>
+        </div>
+        <div class="fc frow"><label>Note (optionnel)</label>
+          <input id="fEnvNote" placeholder="Référence virement, banque…"/>
+        </div>
+      </div>
+    </div>
+    <div class="mf">
+      <button class="btn btn-ghost" onclick="closeM('M_env')">Annuler</button>
+      <button class="btn btn-acc" onclick="saveEnv()">Créer l'enveloppe</button>
+    </div>
+  </div>
+</div>
+
 <!-- MODAL: Débit carte -->
 <div class="ov" id="M_carte">
   <div class="modal">
     <div class="mh"><h3>Nouveau débit carte</h3><button class="mhc" onclick="closeM('M_carte')">×</button></div>
     <div class="mb">
+      <div class="frow fc" style="margin-bottom:12px"><label>Enveloppe</label>
+        <select id="fCarteEnv" onchange="updateCarteEnvInfo()">
+          <option value="">— Sélectionner une enveloppe —</option>
+        </select>
+        <div id="carteEnvInfo" style="font-family:var(--mono);font-size:11px;color:var(--t2);margin-top:6px"></div>
+      </div>
       <div class="fg">
         <div class="frow"><label>Date du débit</label>
           <input type="date" id="fCarteDate"/>
@@ -746,7 +776,7 @@ const SO=['attente','incoming','approvisionne','encours','fini'];
 const SK='declic_mt_v4';
 
 let role='',user='';
-let db={groups:[],budgets:[],history:[],plans:[],carte:[]};
+let db={groups:[],budgets:[],history:[],plans:[],carte:[],envelopes:[]};
 let eGrpId=null,eBudId=null,pDelType=null,pDelId=null,pStatusId=null,pConsoId=null;
 let selColor=COLORS[0];
 
@@ -759,7 +789,7 @@ async function load(){
     const r=await fetch('/api/db?action=get&key='+REDIS_KEY);
     if(!r.ok) throw new Error('HTTP '+r.status);
     const data=await r.json();
-    if(data.value){db=data.value;if(!db.plans)db.plans=[];if(!db.carte)db.carte=[];}
+    if(data.value){db=data.value;if(!db.plans)db.plans=[];if(!db.carte)db.carte=[];if(!db.envelopes)db.envelopes=[];}
     setRedisStatus(true);
   }catch(e){
     console.warn('Redis load failed',e);
@@ -852,6 +882,8 @@ function setupUI(){
   }
   const btnC=document.getElementById('btnAddCarte');
   if(btnC) btnC.style.display=canSeeCarte()?'':'none';
+  const btnE=document.getElementById('btnAddEnv');
+  if(btnE) btnE.style.display=canSeeCarte()?'':'none';
 }
 
 function buildColorPick(){
@@ -1290,7 +1322,11 @@ async function confirmDel(){
     db.plans=db.plans.filter(x=>x.id!==pDelId);
   }else if(pDelType==='carte'){
     db.carte=(db.carte||[]).filter(x=>x.id!==pDelId);
-    log({type:'st',grp:'Carte',desc:'Débit carte supprimé'});
+    log({type:'st',grp:'Carte',desc:'Débit supprimé'});
+  }else if(pDelType==='envelope'){
+    db.carte=(db.carte||[]).filter(x=>x.envId!==pDelId);
+    db.envelopes=(db.envelopes||[]).filter(x=>x.id!==pDelId);
+    log({type:'st',grp:'Carte',desc:'Enveloppe supprimée'});
   }
   await save();closeM('M_del');populateF();renderGroups();renderBudgets();renderDash();
 }
@@ -1727,46 +1763,112 @@ async function removePost(budId,idx){
 function isPartenaire(){ return role==='partenaire'; }
 function canSeeCarte(){ return role==='admin'||role==='partenaire'; }
 
-function renderCarte(){
-  if(!canSeeCarte()){ document.getElementById('P_carte').innerHTML='<div class="empty"><div class="ei">🔒</div><div class="et">Accès restreint</div></div>'; return; }
-  const entries=db.carte||[];
-  const totalMAD=entries.reduce((s,e)=>s+e.mad,0);
-  const totalUSDT=entries.reduce((s,e)=>s+e.usdt,0);
-  const thisMonth=new Date().toISOString().slice(0,7);
-  const monthEntries=entries.filter(e=>e.date&&e.date.startsWith(thisMonth));
-  const monthMAD=monthEntries.reduce((s,e)=>s+e.mad,0);
+function fmt2(n){ return (Math.round(n*100)/100).toLocaleString('fr-MA'); }
 
-  const tags=['Média','Outils','Abonnements','Frais plateforme','Autre'];
-  const tagColors={Média:'var(--blu)',Outils:'var(--grn)',Abonnements:'var(--acc)',"Frais plateforme":'var(--amb)',Autre:'var(--t2)'};
-  const tagKpis=tags.map(t=>{
-    const te=entries.filter(e=>e.tag===t);
-    if(!te.length)return'';
-    return`<div class="kpi"><div class="kpi-l">${t}</div><div class="kpi-v" style="color:${tagColors[t]||'var(--t1)'}">${Math.round(te.reduce((s,e)=>s+e.usdt,0)*100)/100} USDT</div><div class="kpi-s">${fmt(te.reduce((s,e)=>s+e.mad,0))}</div></div>`;
-  }).join('');
+function renderCarte(){
+  if(!canSeeCarte()) return;
+  const envs=db.envelopes||[];
+  const debits=db.carte||[];
+  const totalUSDT=envs.reduce((s,e)=>s+e.usdt,0);
+  const totalMAD=envs.reduce((s,e)=>s+e.mad,0);
+  const totalDebUSDT=debits.reduce((s,d)=>s+d.usdt,0);
+  const totalDebMAD=debits.reduce((s,d)=>s+d.mad,0);
+  const soldeUSDT=totalUSDT-totalDebUSDT;
+  const soldeMAD=totalMAD-totalDebMAD;
+
   document.getElementById('carteKpis').innerHTML=`
-    <div class="kpi hl"><div class="kpi-l">Total débité (USDT)</div><div class="kpi-v">${Math.round(totalUSDT*100)/100} USDT</div><div class="kpi-s">${entries.length} opération(s)</div></div>
-    <div class="kpi"><div class="kpi-l">Équivalent (MAD)</div><div class="kpi-v" style="color:var(--amb)">${fmt(totalMAD)}</div></div>
-    <div class="kpi"><div class="kpi-l">Ce mois</div><div class="kpi-v" style="color:var(--blu)">${fmt(monthMAD)}</div><div class="kpi-s">${monthEntries.length} opération(s)</div></div>
-    ${tagKpis}
+    <div class="kpi hl"><div class="kpi-l">Total approvisionné</div><div class="kpi-v">${fmt2(totalUSDT)} USDT</div><div class="kpi-s">${fmt(totalMAD)}</div></div>
+    <div class="kpi"><div class="kpi-l">Total débité</div><div class="kpi-v" style="color:var(--red)">${fmt2(totalDebUSDT)} USDT</div><div class="kpi-s">${fmt(totalDebMAD)}</div></div>
+    <div class="kpi"><div class="kpi-l">Solde disponible</div><div class="kpi-v" style="color:${soldeUSDT<0?'var(--red)':'var(--grn)'}">${fmt2(soldeUSDT)} USDT</div><div class="kpi-s">${fmt(soldeMAD)}</div></div>
+    <div class="kpi"><div class="kpi-l">Enveloppes</div><div class="kpi-v" style="color:var(--blu)">${envs.length}</div><div class="kpi-s">${debits.length} débit(s)</div></div>
   `;
 
-  const tb=document.getElementById('carteTbody');
-  const sorted=[...entries].sort((a,b)=>new Date(b.date)-new Date(a.date));
-  if(!sorted.length){
-    tb.innerHTML=`<tr><td colspan="7"><div class="empty"><div class="ei">◻</div><div class="et">Aucun débit enregistré</div><div class="es">Clique sur + Débit carte pour commencer</div></div></td></tr>`;
+  const el=document.getElementById('carteEnvList');
+  if(!envs.length){
+    el.innerHTML=`<div class="empty"><div class="ei">◻</div><div class="et">Aucune enveloppe</div><div class="es">Crée une enveloppe avant d'enregistrer des débits</div></div>`;
     return;
   }
-  tb.innerHTML=sorted.map(e=>`<tr>
-    <td class="mono tdim">${fD(e.date)}</td>
-    <td><span style="background:var(--amb2);color:var(--amb);border-radius:100px;padding:2px 10px;font-family:var(--mono);font-size:11px">${e.tag||'—'}</span></td>
-    <td class="mono" style="color:var(--red)">−${Math.round(e.usdt*100)/100} USDT</td>
-    <td class="mono tdim">${fmt(e.mad)}</td>
-    <td class="mono tdim" style="font-size:11px">${e.by||'—'}</td>
-    <td>${isAdmin()?`<button class="btn btn-xs btn-red" onclick="askDel('carte','${e.id}')">✕</button>`:''}</td>
-  </tr>`).join('');
+
+  el.innerHTML=[...envs].reverse().map(env=>{
+    const envDebits=debits.filter(d=>d.envId===env.id);
+    const debUSDT=envDebits.reduce((s,d)=>s+d.usdt,0);
+    const debMAD=envDebits.reduce((s,d)=>s+d.mad,0);
+    const solde=env.usdt-debUSDT;
+    const pct=env.usdt>0?Math.min(Math.round(debUSDT/env.usdt*100),100):0;
+    const delBtn=isAdmin()?`<button class="btn btn-xs btn-red" onclick="askDel('envelope','${env.id}')">Supprimer</button>`:'';
+    return `<div class="card" style="margin-bottom:1rem">
+      <div style="display:flex;align-items:center;justify-content:space-between;padding:1rem 1.25rem;border-bottom:1px solid var(--b1);gap:1rem;flex-wrap:wrap">
+        <div>
+          <div style="font-size:14px;font-weight:500">Enveloppe — ${fmt2(env.usdt)} USDT <span style="font-family:var(--mono);font-size:11px;color:var(--t2)">(${fmt(env.mad)})</span></div>
+          <div style="font-family:var(--mono);font-size:11px;color:var(--t2);margin-top:3px">Appro le ${fD(env.date)}${env.note?' · '+env.note:''} · Taux : ${env.taux} MAD/USDT</div>
+        </div>
+        <div style="display:flex;align-items:center;gap:8px">
+          <span style="font-family:var(--mono);font-size:12px;color:${solde<0?'var(--red)':'var(--grn)'}">Solde : ${fmt2(solde)} USDT</span>
+          ${delBtn}
+        </div>
+      </div>
+      <div style="padding:.875rem 1.25rem;border-bottom:1px solid var(--b1)">
+        <div style="display:flex;justify-content:space-between;font-family:var(--mono);font-size:11px;color:var(--t3);margin-bottom:5px">
+          <span>${pct}% utilisé — ${fmt2(debUSDT)} USDT débités</span>
+          <span>${fmt2(env.usdt-debUSDT)} USDT restants</span>
+        </div>
+        <div class="prg"><div class="prg-f" style="width:${pct}%;background:${pct>80?'var(--red)':pct>50?'var(--amb)':'var(--grn)'}"></div></div>
+      </div>
+      ${envDebits.length?`<div class="tbl-wrap"><table><thead><tr>
+        <th>Date</th><th>Catégorie</th><th>USDT</th><th>MAD</th><th>Saisi par</th><th></th>
+      </tr></thead><tbody>
+        ${[...envDebits].reverse().map(d=>`<tr>
+          <td class="mono tdim">${fD(d.date)}</td>
+          <td><span style="background:var(--amb2);color:var(--amb);border-radius:100px;padding:2px 10px;font-family:var(--mono);font-size:11px">${d.tag||'—'}</span></td>
+          <td class="mono" style="color:var(--red)">−${fmt2(d.usdt)} USDT</td>
+          <td class="mono tdim">${fmt(d.mad)}</td>
+          <td class="mono tdim" style="font-size:11px">${d.by||'—'}</td>
+          <td>${isAdmin()?`<button class="btn btn-xs btn-red" onclick="askDel('carte','${d.id}')">✕</button>`:''}</td>
+        </tr>`).join('')}
+      </tbody></table></div>`:`<div style="padding:1rem 1.25rem;font-family:var(--mono);font-size:12px;color:var(--t3)">Aucun débit sur cette enveloppe</div>`}
+    </div>`;
+  }).join('');
 }
 
-function openCarteModal(){
+// Envelope modal
+function openEnvModal(){
+  document.getElementById('fEnvDate').value=new Date().toISOString().split('T')[0];
+  document.getElementById('fEnvUSDT').value='';
+  document.getElementById('fEnvMAD').value='';
+  document.getElementById('fEnvTaux').value='10.8';
+  document.getElementById('fEnvNote').value='';
+  openM('M_env');
+}
+function calcEnvMAD(){
+  const usdt=parseFloat(document.getElementById('fEnvUSDT').value)||0;
+  const taux=parseFloat(document.getElementById('fEnvTaux').value)||10.8;
+  document.getElementById('fEnvMAD').value=usdt>0?Math.round(usdt*taux):'';
+}
+async function saveEnv(){
+  const usdt=parseFloat(document.getElementById('fEnvUSDT').value)||0;
+  const taux=parseFloat(document.getElementById('fEnvTaux').value)||10.8;
+  const mad=usdt>0?Math.round(usdt*taux):0;
+  const date=document.getElementById('fEnvDate').value;
+  const note=document.getElementById('fEnvNote').value;
+  if(!usdt)return alert('Montant requis');
+  if(!db.envelopes)db.envelopes=[];
+  db.envelopes.push({id:uid(),usdt,mad,taux,date,note,by:user,createdAt:now()});
+  log({type:'cr',grp:'Carte',desc:`Enveloppe créée — ${fmt2(usdt)} USDT (${fmt(mad)})`,amount:usdt,dir:'+'});
+  await save();
+  closeM('M_env');
+  renderCarte();
+}
+
+function openCarteModal(){function openCarteModal(){
+  const envSel=document.getElementById('fCarteEnv');
+  const envs=db.envelopes||[];
+  envSel.innerHTML=`<option value="">— Sélectionner une enveloppe —</option>`+
+    [...envs].reverse().map(e=>{
+      const used=( db.carte||[]).filter(d=>d.envId===e.id).reduce((s,d)=>s+d.usdt,0);
+      const left=e.usdt-used;
+      return`<option value="${e.id}">${fD(e.date)} — ${fmt2(e.usdt)} USDT (solde: ${fmt2(left)} USDT)</option>`;
+    }).join('');
+  document.getElementById('carteEnvInfo').textContent='';
   document.getElementById('fCarteDate').value=new Date().toISOString().split('T')[0];
   document.getElementById('fCarteUSDT').value='';
   document.getElementById('fCarteMAD2').value='';
@@ -1774,6 +1876,20 @@ function openCarteModal(){
   document.getElementById('fCarteTag').value='';
   document.querySelectorAll('.carte-tag').forEach(b=>b.classList.remove('selected'));
   openM('M_carte');
+}
+
+function updateCarteEnvInfo(){
+  const envId=document.getElementById('fCarteEnv').value;
+  const info=document.getElementById('carteEnvInfo');
+  if(!envId){info.textContent='';return;}
+  const env=(db.envelopes||[]).find(e=>e.id===envId);
+  if(!env){info.textContent='';return;}
+  const used=(db.carte||[]).filter(d=>d.envId===envId).reduce((s,d)=>s+d.usdt,0);
+  const left=env.usdt-used;
+  info.innerHTML=`Taux : ${env.taux} MAD/USDT &nbsp;|&nbsp; Solde : <strong style="color:${left<0?'var(--red)':'var(--grn)'}">${fmt2(left)} USDT</strong>`;
+  // Auto-fill taux from envelope
+  document.getElementById('fCarteTaux').value=env.taux;
+  calcCarteUSDT();
 }
 
 function selectCarteTag(btn, tag){
@@ -1796,7 +1912,7 @@ async function saveCarte(){
   const tag=document.getElementById('fCarteTag').value;
   if(!usdt)return alert('Montant requis');
   if(!tag)return alert('Sélectionne une catégorie');
-  if(!db.carte)db.carte=[];
+  if(!db.carte)db.carte=[];if(!db.envelopes)db.envelopes=[];
   db.carte.push({id:uid(),mad,usdt,taux,date,tag,by:user,addedAt:now()});
   log({type:'db',grp:'Carte',desc:`Débit carte — ${tag} — ${usdt} USDT → ${fmt(mad)}`,amount:usdt,dir:'−'});
   await save();
