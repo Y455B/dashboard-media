@@ -1768,11 +1768,11 @@ function renderCarte(){
 
 function openCarteModal(){
   document.getElementById('fCarteDate').value=new Date().toISOString().split('T')[0];
-  document.getElementById('fCarteMAD').value='';
+  document.getElementById('fCarteUSDT').value='';
   document.getElementById('fCarteMAD2').value='';
-  document.getElementById('fCarteClient').value='';
-  document.getElementById('fCarteNote').value='';
   document.getElementById('fCarteTaux').value='10.8';
+  document.getElementById('fCarteTag').value='';
+  document.querySelectorAll('.carte-tag').forEach(b=>b.classList.remove('selected'));
   openM('M_carte');
 }
 
