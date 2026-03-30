@@ -411,6 +411,10 @@ tr:hover td{background:var(--s2)}
             <option value="encours">En cours (traffic actif)</option>
           </select>
         </div>
+        <div class="fc frow">
+          <label>Ligne plan média liée (optionnel)</label>
+          <select id="fBPMLine"><option value="">— Aucune —</option></select>
+        </div>
         <div class="fc frow"><label>Note</label><input id="fBN" placeholder="Ref devis, contexte…"/></div>
       </div>
     </div>
@@ -582,6 +586,21 @@ tr:hover td{background:var(--s2)}
       </div>
     </div>
     <div class="mb" id="mPVBody"></div>
+  </div>
+</div>
+
+<!-- MODAL: Lier PM -->
+<div class="ov" id="M_link">
+  <div class="modal">
+    <div class="mh"><h3>Lier à une ligne de plan média</h3><button class="mhc" onclick="closeM('M_link')">×</button></div>
+    <div class="mb">
+      <div style="font-family:var(--mono);font-size:11px;color:var(--t2);margin-bottom:1rem" id="mLinkDesc"></div>
+      <div class="frow"><label>Ligne plan média</label><select id="fLinkPM"></select></div>
+    </div>
+    <div class="mf">
+      <button class="btn btn-ghost" onclick="closeM('M_link')">Annuler</button>
+      <button class="btn btn-acc" onclick="saveLinkPM()">Confirmer</button>
+    </div>
   </div>
 </div>
 
@@ -849,6 +868,22 @@ function updateClients(){
   const gid=document.getElementById('fBG').value;
   const g=db.groups.find(x=>x.id===gid);
   document.getElementById('fBC').innerHTML=(g?g.clients:[]).map(c=>`<option value="${c}">${c}</option>`).join('');
+  updateBudPMLines();
+}
+
+function updateBudPMLines(){
+  const client=document.getElementById('fBC')?.value;
+  const sel=document.getElementById('fBPMLine');
+  if(!sel)return;
+  const lines=[];
+  (db.plans||[]).forEach(p=>{
+    if(!client||p.client===client){
+      p.lines.forEach((l,i)=>{
+        lines.push({val:`${p.id}__${i}`,label:`${p.client} · ${p.period||'—'} — ${l.canal} (${fmt(l.budget)})`});
+      });
+    }
+  });
+  sel.innerHTML=`<option value="">— Aucune —</option>`+lines.map(l=>`<option value="${l.val}">${l.label}</option>`).join('');
 }
 function openBudModalFromConso(groupId, client){
   openBudModal();
@@ -871,6 +906,7 @@ function openBudModal(id){
   const gs=document.getElementById('fBG');
   gs.innerHTML=db.groups.map(g=>`<option value="${g.id}">${g.name}</option>`).join('');
   updateClients();
+  updateBudPMLines();
   if(id){
     const b=db.budgets.find(x=>x.id===id);
     gs.value=b.groupId;updateClients();
@@ -881,6 +917,8 @@ function openBudModal(id){
     document.getElementById('fBF').value=b.fraisPct;
     document.getElementById('fBS').value=b.status;
     document.getElementById('fBN').value=b.note||'';
+    updateBudPMLines();
+    document.getElementById('fBPMLine').value=b.pmLineId||'';
     calcNet();
   }else{
     ['fBD','fBP','fBN'].forEach(id=>document.getElementById(id).value='');
@@ -898,15 +936,16 @@ function saveBud(){
   const fraisPct=parseFloat(document.getElementById('fBF').value)||0;
   const status=document.getElementById('fBS').value;
   const note=document.getElementById('fBN').value;
+  const pmLineId=document.getElementById('fBPMLine')?.value||'';
   if(!devis)return alert('Montant devis requis');
   if(!groupId||!db.groups.find(g=>g.id===groupId))return alert('Sélectionne un groupe');
   const netAmt=net(devis,fraisPct);
   if(eBudId){
     const idx=db.budgets.findIndex(b=>b.id===eBudId);
-    db.budgets[idx]={...db.budgets[idx],groupId,client,canal,period,devis,fraisPct,netAmt,status,note};
+    db.budgets[idx]={...db.budgets[idx],groupId,client,canal,period,devis,fraisPct,netAmt,status,note,pmLineId};
     log({type:'st',grp:gName(groupId),client,desc:`Dossier modifié — ${canal}`});
   }else{
-    db.budgets.push({id:uid(),groupId,client,canal,period,devis,fraisPct,netAmt,conso:0,status,note,createdAt:now()});
+    db.budgets.push({id:uid(),groupId,client,canal,period,devis,fraisPct,netAmt,conso:0,status,note:notes,pmLineId,createdAt:now()});
     log({type:'nw',grp:gName(groupId),client,desc:`Nouveau dossier — ${client} · ${canal} · ${period} · devis ${fmt(devis)} · net ${fmt(netAmt)}`});
   }
   save();closeM('M_bud');populateF();renderBudgets();renderDash();
@@ -957,12 +996,14 @@ function renderConso(){
     return `<div class="cc">
       <div class="cc-head">
         <div>
-          <div class="cc-name">${dot(b.groupId)}${b.client} — ${b.canal}</div>
-          <div class="cc-meta">${gName(b.groupId)} · ${b.period||'—'} · <span class="badge ${SC[b.status]}">${SL[b.status]}</span></div>
+          <div class="cc-name">${dot(b.groupId)}${b.client} — ${b.canal}${b.period?' <span style="font-family:var(--mono);font-size:11px;color:var(--acc);font-weight:400;margin-left:4px">['+b.period+']</span>':''}</div>
+          <div class="cc-meta">${gName(b.groupId)} · <span class="badge ${SC[b.status]}">${SL[b.status]}</span></div>
         </div>
-        <div style="display:flex;gap:6px">
+        <div style="display:flex;gap:6px;flex-wrap:wrap">
           <button class="btn btn-xs btn-ghost" onclick="openConsoModal('${b.id}')" ${dis}>Mettre à jour</button>
-          <button class="btn btn-xs btn-acc" onclick="openBudModalFromConso('${b.groupId}','${b.client}')" ${dis} title="Ajouter un nouveau dossier pour ce client">+ Dossier</button>
+          <button class="btn btn-xs btn-ghost" onclick="openLinkPMModal('${b.id}')" ${dis} title="Lier à une ligne de plan média">Lier PM</button>
+          <button class="btn btn-xs btn-acc" onclick="openBudModalFromConso('${b.groupId}','${b.client}')" ${dis} title="Ajouter un nouveau dossier">+ Dossier</button>
+          ${isAdmin()?`<button class="btn btn-xs btn-red" onclick="askDel('budget','${b.id}')">Supprimer</button>`:''}
         </div>
       </div>
       <div class="cc-stats">
@@ -974,13 +1015,14 @@ function renderConso(){
         <div class="prg" style="flex:1"><div class="prg-f" style="width:${pct}%;background:${pct>80?'var(--red)':pct>50?'var(--amb)':'var(--grn)'}"></div></div>
         <div class="mono tdim" style="font-size:11px;flex-shrink:0">${pct}% brûlé</div>
       </div>
+      ${getPMLineBadge(b.pmLineId)}
     </div>`;
   }).join('');
 }
 function openConsoModal(id){
   pConsoId=id;
   const b=db.budgets.find(x=>x.id===id);
-  document.getElementById('mConsoDesc').textContent=`${b.client} — ${b.canal} — ${b.period||'—'}  |  Net carte : ${fmt(b.netAmt)}  |  Déjà consommé : ${fmt(b.conso)}`;
+  document.getElementById('mConsoDesc').textContent=`${b.client}${b.period?' ['+b.period+']':''} — ${b.canal}  |  Budget net carte : ${fmt(b.netAmt)}  |  Déjà dépensé : ${fmt(b.conso)}`;
   document.getElementById('fCA').value='';document.getElementById('fCN').value='';
   document.getElementById('fCD').value=new Date().toISOString().split('T')[0];
   document.getElementById('fCM').value='cumul';
@@ -988,10 +1030,10 @@ function openConsoModal(id){
 }
 function toggleConsoMode(){
   const mode=document.getElementById('fCM').value;
-  document.getElementById('fCAL').textContent=mode==='cumul'?'Total consommé à ce jour (DH)':'Montant de cette dépense (DH)';
+  document.getElementById('fCAL').textContent=mode==='cumul'?'Total dépensé à ce jour (DH)':'Montant dépensé (ajout ponctuel, DH)';
   const b=db.budgets.find(x=>x.id===pConsoId);
   const box=document.getElementById('consoCalc');
-  if(mode==='delta'&&b){box.style.display='block';box.innerHTML=`Déjà consommé : ${fmt(b.conso)}<br>Nouveau total après ajout : <strong>sera calculé à la saisie</strong>`;}
+  if(mode==='delta'&&b){box.style.display='block';box.innerHTML=`Déjà dépensé : <strong>${fmt(b.conso)}</strong><br>Nouveau total après ajout : <strong>sera calculé à la saisie</strong>`;}
   else{box.style.display='none';}
 }
 function saveConso(){
@@ -1334,9 +1376,85 @@ function exportPlanPDF(){
   w.document.close();
 }
 
+// PM LINE HELPERS
+function getPMLineBadge(pmLineId){
+  if(!pmLineId)return'';
+  const parts=pmLineId.split('__');
+  const plan=db.plans.find(p=>p.id===parts[0]);
+  if(!plan)return'';
+  const line=plan.lines[parseInt(parts[1])];
+  if(!line)return'';
+  return`<div style="margin-top:8px;display:flex;align-items:center;gap:6px">
+    <span style="font-family:var(--mono);font-size:10px;color:var(--t3);text-transform:uppercase;letter-spacing:.06em">PM lié</span>
+    <span style="background:var(--blu2);color:var(--blu);border:1px solid rgba(91,156,246,.2);border-radius:100px;padding:2px 10px;font-family:var(--mono);font-size:11px">${plan.client} · ${plan.period||'—'} — ${line.canal} (${fmt(line.budget)})</span>
+  </div>`;
+}
+
+let pendingLinkBudId=null;
+function openLinkPMModal(budId){
+  pendingLinkBudId=budId;
+  const b=db.budgets.find(x=>x.id===budId);
+  const sel=document.getElementById('fLinkPM');
+  const lines=[];
+  (db.plans||[]).forEach(p=>{
+    if(p.client===b.client||true){
+      p.lines.forEach((l,i)=>{
+        lines.push({val:`${p.id}__${i}`,label:`${p.client} · ${p.period||'—'} — ${l.canal} (${fmt(l.budget)})`});
+      });
+    }
+  });
+  sel.innerHTML=`<option value="">— Aucune —</option>`+lines.map(l=>`<option value="${l.val}"${b.pmLineId===l.val?' selected':''}>${l.label}</option>`).join('');
+  document.getElementById('mLinkDesc').textContent=`${b.client} — ${b.canal}${b.period?' ['+b.period+']':''}`;
+  openM('M_link');
+}
+function saveLinkPM(){
+  const b=db.budgets.find(x=>x.id===pendingLinkBudId);
+  b.pmLineId=document.getElementById('fLinkPM').value;
+  log({type:'st',grp:gName(b.groupId),client:b.client,desc:`Lien PM mis à jour — ${b.canal}`});
+  save();closeM('M_link');renderConso();
+}
+
 function openM(id){document.getElementById(id).classList.add('on');}
 function closeM(id){document.getElementById(id).classList.remove('on');}
 document.querySelectorAll('.ov').forEach(o=>{o.addEventListener('click',e=>{if(e.target===o)o.classList.remove('on');});});
+
+// PM LINE HELPERS
+function getPMLineBadge(pmLineId){
+  if(!pmLineId)return'';
+  const parts=pmLineId.split('__');
+  const plan=db.plans.find(p=>p.id===parts[0]);
+  if(!plan)return'';
+  const line=plan.lines[parseInt(parts[1])];
+  if(!line)return'';
+  return`<div style="margin-top:8px;display:flex;align-items:center;gap:6px">
+    <span style="font-family:var(--mono);font-size:10px;color:var(--t3);text-transform:uppercase;letter-spacing:.06em">PM lié</span>
+    <span style="background:var(--blu2);color:var(--blu);border:1px solid rgba(91,156,246,.2);border-radius:100px;padding:2px 10px;font-family:var(--mono);font-size:11px">${plan.client} · ${plan.period||'—'} — ${line.canal} (${fmt(line.budget)})</span>
+  </div>`;
+}
+
+let pendingLinkBudId=null;
+function openLinkPMModal(budId){
+  pendingLinkBudId=budId;
+  const b=db.budgets.find(x=>x.id===budId);
+  const sel=document.getElementById('fLinkPM');
+  const lines=[];
+  (db.plans||[]).forEach(p=>{
+    if(p.client===b.client||true){
+      p.lines.forEach((l,i)=>{
+        lines.push({val:`${p.id}__${i}`,label:`${p.client} · ${p.period||'—'} — ${l.canal} (${fmt(l.budget)})`});
+      });
+    }
+  });
+  sel.innerHTML=`<option value="">— Aucune —</option>`+lines.map(l=>`<option value="${l.val}"${b.pmLineId===l.val?' selected':''}>${l.label}</option>`).join('');
+  document.getElementById('mLinkDesc').textContent=`${b.client} — ${b.canal}${b.period?' ['+b.period+']':''}`;
+  openM('M_link');
+}
+function saveLinkPM(){
+  const b=db.budgets.find(x=>x.id===pendingLinkBudId);
+  b.pmLineId=document.getElementById('fLinkPM').value;
+  log({type:'st',grp:gName(b.groupId),client:b.client,desc:`Lien PM mis à jour — ${b.canal}`});
+  save();closeM('M_link');renderConso();
+}
 
 function openM(id){document.getElementById(id).classList.add('on');}
 function closeM(id){document.getElementById(id).classList.remove('on');}
