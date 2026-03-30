@@ -349,6 +349,15 @@ tr:hover td{background:var(--s2)}
       <div id="plansList"></div>
     </div>
 
+    <!-- PLANS MÉDIA -->
+    <div class="page" id="P_plans">
+      <div class="ph">
+        <div class="ph-l"><h1>Plans média</h1><p>Établis et archive les plans par client</p></div>
+        <div class="ph-r" id="plansActions"></div>
+      </div>
+      <div id="plansList"></div>
+    </div>
+
     <!-- HISTORIQUE -->
     <div class="page" id="P_history">
       <div class="ph">
@@ -507,6 +516,75 @@ tr:hover td{background:var(--s2)}
   </div>
 </div>
 
+<!-- MODAL: Plan Média -->
+<div class="ov" id="M_plan">
+  <div class="modal" style="max-width:680px">
+    <div class="mh"><h3 id="mPlanT">Nouveau plan média</h3><button class="mhc" onclick="closeM('M_plan')">×</button></div>
+    <div class="mb">
+      <div class="fg">
+        <div class="frow"><label>Nom du plan</label><input id="fPN" placeholder="ex: SBM — Plan Q2 2025"/></div>
+        <div class="frow"><label>Période</label><input id="fPPer" placeholder="ex: Avril–Juin 2025"/></div>
+        <div class="frow"><label>Lié à un groupe (optionnel)</label>
+          <select id="fPGrp"><option value="">— Aucun —</option></select>
+        </div>
+        <div class="frow"><label>Lié à un dossier budget (optionnel)</label>
+          <select id="fPBud"><option value="">— Aucun —</option></select>
+        </div>
+        <div class="fc frow"><label>Notes / recommandations stratégiques</label>
+          <textarea id="fPNotes" rows="3" placeholder="Contexte, objectifs globaux, recommandations..." style="resize:vertical"></textarea>
+        </div>
+      </div>
+
+      <div style="margin-top:1.25rem">
+        <div style="display:flex;align-items:center;justify-content:space-between;margin-bottom:.75rem">
+          <div style="font-family:var(--mono);font-size:11px;color:var(--t2);text-transform:uppercase;letter-spacing:.08em">Lignes du plan</div>
+          <button class="btn btn-xs btn-ghost" onclick="addPlanLine()">+ Ligne</button>
+        </div>
+        <div style="overflow-x:auto">
+          <table style="width:100%;border-collapse:collapse;font-size:12px">
+            <thead><tr>
+              <th style="text-align:left;padding:6px 8px;border-bottom:1px solid var(--b1);font-family:var(--mono);font-size:10px;color:var(--t3);text-transform:uppercase;font-weight:400">Client / Marque</th>
+              <th style="text-align:left;padding:6px 8px;border-bottom:1px solid var(--b1);font-family:var(--mono);font-size:10px;color:var(--t3);text-transform:uppercase;font-weight:400">Canal</th>
+              <th style="text-align:left;padding:6px 8px;border-bottom:1px solid var(--b1);font-family:var(--mono);font-size:10px;color:var(--t3);text-transform:uppercase;font-weight:400">Budget (DH)</th>
+              <th style="text-align:left;padding:6px 8px;border-bottom:1px solid var(--b1);font-family:var(--mono);font-size:10px;color:var(--t3);text-transform:uppercase;font-weight:400">Période</th>
+              <th style="text-align:left;padding:6px 8px;border-bottom:1px solid var(--b1);font-family:var(--mono);font-size:10px;color:var(--t3);text-transform:uppercase;font-weight:400">Objectif</th>
+              <th style="text-align:left;padding:6px 8px;border-bottom:1px solid var(--b1);font-family:var(--mono);font-size:10px;color:var(--t3);text-transform:uppercase;font-weight:400">KPI cible</th>
+              <th style="text-align:left;padding:6px 8px;border-bottom:1px solid var(--b1);font-family:var(--mono);font-size:10px;color:var(--t3);text-transform:uppercase;font-weight:400">Ciblage</th>
+              <th style="padding:6px 8px;border-bottom:1px solid var(--b1)"></th>
+            </tr></thead>
+            <tbody id="planLinesBody"></tbody>
+          </table>
+        </div>
+        <div style="font-family:var(--mono);font-size:11px;color:var(--t2);margin-top:8px;text-align:right">
+          Total : <strong id="planLinesTotal" style="color:var(--acc)">0 DH</strong>
+        </div>
+      </div>
+    </div>
+    <div class="mf">
+      <button class="btn btn-ghost" onclick="closeM('M_plan')">Annuler</button>
+      <button class="btn btn-acc" onclick="savePlan()">Enregistrer</button>
+    </div>
+  </div>
+</div>
+
+<!-- MODAL: Plan Viewer -->
+<div class="ov" id="M_planView">
+  <div class="modal" style="max-width:760px">
+    <div class="mh">
+      <div>
+        <h3 id="mPVTitle"></h3>
+        <div style="font-family:var(--mono);font-size:11px;color:var(--t2);margin-top:3px" id="mPVMeta"></div>
+      </div>
+      <div style="display:flex;gap:8px;align-items:center">
+        <button class="btn btn-xs btn-ghost" onclick="exportPlanXLSX()">↓ Excel</button>
+        <button class="btn btn-xs btn-ghost" onclick="exportPlanPDF()">↓ PDF</button>
+        <button class="mhc" onclick="closeM('M_planView')">×</button>
+      </div>
+    </div>
+    <div class="mb" id="mPVBody"></div>
+  </div>
+</div>
+
 <!-- MODAL: Delete -->
 <div class="ov" id="M_del">
   <div class="modal">
@@ -534,6 +612,7 @@ let isSaving=false;
 
 async function load(){
   try{
+    if(!db.plans)db.plans=[];
     const r=await fetch('/api/db?action=get&key='+REDIS_KEY);
     if(!r.ok) throw new Error('HTTP '+r.status);
     const data=await r.json();
@@ -771,6 +850,21 @@ function updateClients(){
   const g=db.groups.find(x=>x.id===gid);
   document.getElementById('fBC').innerHTML=(g?g.clients:[]).map(c=>`<option value="${c}">${c}</option>`).join('');
 }
+function openBudModalFromConso(groupId, client){
+  openBudModal();
+  // Pre-select group and client
+  const gs=document.getElementById('fBG');
+  if(gs){
+    gs.value=groupId;
+    updateClients();
+    const cl=document.getElementById('fBC');
+    if(cl) cl.value=client;
+  }
+  // Set status to incoming by default for new dossier
+  const st=document.getElementById('fBS');
+  if(st) st.value='incoming';
+}
+
 function openBudModal(id){
   eBudId=id||null;
   document.getElementById('mBudT').textContent=id?'Modifier le dossier':'Nouveau dossier';
@@ -866,7 +960,10 @@ function renderConso(){
           <div class="cc-name">${dot(b.groupId)}${b.client} — ${b.canal}</div>
           <div class="cc-meta">${gName(b.groupId)} · ${b.period||'—'} · <span class="badge ${SC[b.status]}">${SL[b.status]}</span></div>
         </div>
-        <button class="btn btn-xs btn-ghost" onclick="openConsoModal('${b.id}')" ${dis}>Mettre à jour</button>
+        <div style="display:flex;gap:6px">
+          <button class="btn btn-xs btn-ghost" onclick="openConsoModal('${b.id}')" ${dis}>Mettre à jour</button>
+          <button class="btn btn-xs btn-acc" onclick="openBudModalFromConso('${b.groupId}','${b.client}')" ${dis} title="Ajouter un nouveau dossier pour ce client">+ Dossier</button>
+        </div>
       </div>
       <div class="cc-stats">
         <div class="cs"><div class="cs-l">Net carte</div><div class="cs-v" style="color:var(--grn)">${fmt(b.netAmt)}</div></div>
@@ -1241,25 +1338,11 @@ function openM(id){document.getElementById(id).classList.add('on');}
 function closeM(id){document.getElementById(id).classList.remove('on');}
 document.querySelectorAll('.ov').forEach(o=>{o.addEventListener('click',e=>{if(e.target===o)o.classList.remove('on');});});
 
-// Auto-restore session on refresh
-(async function(){
-  const s=localStorage.getItem('declic_session');
-  if(!s)return;
-  try{
-    const parsed=JSON.parse(s);
-    if(!parsed||!parsed.role)return;
-    role=parsed.role;
-    user=parsed.user;
-    await load();
-    document.getElementById('S_login').classList.remove('on');
-    document.getElementById('S_app').classList.add('on');
-    setupUI();
-    renderAll();
-  }catch(e){
-    console.warn('Session restore failed',e);
-    localStorage.removeItem('declic_session');
-  }
-})();
+function openM(id){document.getElementById(id).classList.add('on');}
+function closeM(id){document.getElementById(id).classList.remove('on');}
+document.querySelectorAll('.ov').forEach(o=>{o.addEventListener('click',e=>{if(e.target===o)o.classList.remove('on');});});
+
 </script>
+<script src="https://cdn.jsdelivr.net/npm/xlsx@0.18.5/dist/xlsx.full.min.js"></script>
 </body>
 </html>
