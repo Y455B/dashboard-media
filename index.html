@@ -192,6 +192,9 @@ tr:hover td{background:var(--s2)}
 .et{font-size:14px;margin-bottom:.4rem}
 .es{font-family:var(--mono);font-size:12px;color:var(--t3)}
 
+.carte-tag{padding:5px 14px;border-radius:100px;border:1px solid var(--b2);background:transparent;color:var(--t2);font-family:var(--mono);font-size:11px;cursor:pointer;transition:all .15s}
+.carte-tag:hover{border-color:var(--acc);color:var(--acc)}
+.carte-tag.selected{background:var(--acc);color:#000;border-color:var(--acc)}
 @media print{
   .side,.ph-r,button,.mf{display:none!important}
   .page{padding:0!important}
@@ -373,7 +376,7 @@ tr:hover td{background:var(--s2)}
       <div class="card">
         <div class="tbl-wrap">
           <table><thead><tr>
-            <th>Date</th><th>Client / Dossier</th><th>Montant (MAD)</th><th>Montant (USDT)</th><th>Note</th><th>Saisi par</th><th></th>
+            <th>Date</th><th>Client / Dossier</th><th>USDT</th><th>Montant (USDT)</th><th>Note</th><th>Saisi par</th><th></th>
           </tr></thead>
           <tbody id="carteTbody"></tbody>
         </table></div>
@@ -623,20 +626,24 @@ tr:hover td{background:var(--s2)}
         <div class="frow"><label>Date du débit</label>
           <input type="date" id="fCarteDate"/>
         </div>
-        <div class="frow"><label>Montant débité (MAD)</label>
-          <input type="number" id="fCarteMAD" placeholder="1 500" oninput="calcCarteUSDT()"/>
+        <div class="frow"><label>Montant débité (USDT)</label>
+          <input type="number" id="fCarteUSDT" placeholder="110" oninput="calcCarteUSDT()"/>
         </div>
         <div class="frow"><label>Taux de change (MAD/USDT)</label>
           <input type="number" id="fCarteTaux" placeholder="10.8" step="0.01" value="10.8" oninput="calcCarteUSDT()"/>
         </div>
-        <div class="frow"><label>Équivalent (USDT)</label>
+        <div class="frow"><label>Équivalent (MAD)</label>
           <input type="number" id="fCarteMAD2" placeholder="calculé auto" readonly style="opacity:.6"/>
         </div>
-        <div class="fc frow"><label>Client / Dossier concerné</label>
-          <input id="fCarteClient" placeholder="FSO — Meta Ads Q1…"/>
-        </div>
-        <div class="fc frow"><label>Note</label>
-          <input id="fCarteNote" placeholder="Référence, détail du paiement…"/>
+        <div class="fc frow"><label>Catégorie</label>
+          <div style="display:flex;gap:8px;flex-wrap:wrap;margin-top:4px" id="carteTagPicker">
+            <button type="button" class="carte-tag" onclick="selectCarteTag(this,'Média')">Média</button>
+            <button type="button" class="carte-tag" onclick="selectCarteTag(this,'Outils')">Outils</button>
+            <button type="button" class="carte-tag" onclick="selectCarteTag(this,'Abonnements')">Abonnements</button>
+            <button type="button" class="carte-tag" onclick="selectCarteTag(this,'Frais plateforme')">Frais plateforme</button>
+            <button type="button" class="carte-tag" onclick="selectCarteTag(this,'Autre')">Autre</button>
+          </div>
+          <input type="hidden" id="fCarteTag" value=""/>
         </div>
       </div>
     </div>
@@ -1524,7 +1531,10 @@ function exportPlanPDF(){
     tr:last-child td{border-bottom:none}
     .total td{font-weight:700;background:#f9f9f9;border-top:2px solid #ddd}
     .footer{margin-top:2rem;font-size:10px;color:#aaa;text-align:right}
-    @media print{body{padding:1rem}}
+    .carte-tag{padding:5px 14px;border-radius:100px;border:1px solid var(--b2);background:transparent;color:var(--t2);font-family:var(--mono);font-size:11px;cursor:pointer;transition:all .15s}
+.carte-tag:hover{border-color:var(--acc);color:var(--acc)}
+.carte-tag.selected{background:var(--acc);color:#000;border-color:var(--acc)}
+@media print{body{padding:1rem}}
   </style></head><body>
   <h1>Plan Média — ${p.client}</h1>
   <div class="sub">${gName(p.groupId)} · ${p.period||'—'} · Généré le ${new Date().toLocaleDateString('fr-FR')}</div>
@@ -1726,10 +1736,18 @@ function renderCarte(){
   const monthEntries=entries.filter(e=>e.date&&e.date.startsWith(thisMonth));
   const monthMAD=monthEntries.reduce((s,e)=>s+e.mad,0);
 
+  const tags=['Média','Outils','Abonnements','Frais plateforme','Autre'];
+  const tagColors={Média:'var(--blu)',Outils:'var(--grn)',Abonnements:'var(--acc)',"Frais plateforme":'var(--amb)',Autre:'var(--t2)'};
+  const tagKpis=tags.map(t=>{
+    const te=entries.filter(e=>e.tag===t);
+    if(!te.length)return'';
+    return`<div class="kpi"><div class="kpi-l">${t}</div><div class="kpi-v" style="color:${tagColors[t]||'var(--t1)'}">${Math.round(te.reduce((s,e)=>s+e.usdt,0)*100)/100} USDT</div><div class="kpi-s">${fmt(te.reduce((s,e)=>s+e.mad,0))}</div></div>`;
+  }).join('');
   document.getElementById('carteKpis').innerHTML=`
-    <div class="kpi hl"><div class="kpi-l">Total débité (MAD)</div><div class="kpi-v">${fmt(totalMAD)}</div><div class="kpi-s">${entries.length} opération(s)</div></div>
-    <div class="kpi"><div class="kpi-l">Total (USDT)</div><div class="kpi-v" style="color:var(--amb)">${Math.round(totalUSDT*100)/100} USDT</div></div>
+    <div class="kpi hl"><div class="kpi-l">Total débité (USDT)</div><div class="kpi-v">${Math.round(totalUSDT*100)/100} USDT</div><div class="kpi-s">${entries.length} opération(s)</div></div>
+    <div class="kpi"><div class="kpi-l">Équivalent (MAD)</div><div class="kpi-v" style="color:var(--amb)">${fmt(totalMAD)}</div></div>
     <div class="kpi"><div class="kpi-l">Ce mois</div><div class="kpi-v" style="color:var(--blu)">${fmt(monthMAD)}</div><div class="kpi-s">${monthEntries.length} opération(s)</div></div>
+    ${tagKpis}
   `;
 
   const tb=document.getElementById('carteTbody');
@@ -1740,10 +1758,9 @@ function renderCarte(){
   }
   tb.innerHTML=sorted.map(e=>`<tr>
     <td class="mono tdim">${fD(e.date)}</td>
-    <td style="font-weight:500">${e.client||'—'}</td>
-    <td class="mono" style="color:var(--red)">−${fmt(e.mad)}</td>
-    <td class="mono tdim">${Math.round(e.usdt*100)/100} USDT</td>
-    <td class="dim" style="font-size:12px">${e.note||'—'}</td>
+    <td><span style="background:var(--amb2);color:var(--amb);border-radius:100px;padding:2px 10px;font-family:var(--mono);font-size:11px">${e.tag||'—'}</span></td>
+    <td class="mono" style="color:var(--red)">−${Math.round(e.usdt*100)/100} USDT</td>
+    <td class="mono tdim">${fmt(e.mad)}</td>
     <td class="mono tdim" style="font-size:11px">${e.by||'—'}</td>
     <td>${isAdmin()?`<button class="btn btn-xs btn-red" onclick="askDel('carte','${e.id}')">✕</button>`:''}</td>
   </tr>`).join('');
@@ -1759,23 +1776,29 @@ function openCarteModal(){
   openM('M_carte');
 }
 
+function selectCarteTag(btn, tag){
+  document.querySelectorAll('.carte-tag').forEach(b=>b.classList.remove('selected'));
+  btn.classList.add('selected');
+  document.getElementById('fCarteTag').value=tag;
+}
+
 function calcCarteUSDT(){
-  const mad=parseFloat(document.getElementById('fCarteMAD').value)||0;
+  const usdt=parseFloat(document.getElementById('fCarteUSDT').value)||0;
   const taux=parseFloat(document.getElementById('fCarteTaux').value)||10.8;
-  document.getElementById('fCarteMAD2').value=mad>0?Math.round(mad/taux*100)/100:'';
+  document.getElementById('fCarteMAD2').value=usdt>0?Math.round(usdt*taux):'';
 }
 
 async function saveCarte(){
-  const mad=parseFloat(document.getElementById('fCarteMAD').value)||0;
+  const mad=parseFloat(document.getElementById('fCarteUSDT').value)||0;
   const taux=parseFloat(document.getElementById('fCarteTaux').value)||10.8;
   const usdt=mad>0?Math.round(mad/taux*100)/100:0;
   const date=document.getElementById('fCarteDate').value;
-  const client=document.getElementById('fCarteClient').value;
-  const note=document.getElementById('fCarteNote').value;
+  const tag=document.getElementById('fCarteTag').value;
   if(!mad)return alert('Montant requis');
+  if(!tag)return alert('Sélectionne une catégorie');
   if(!db.carte)db.carte=[];
-  db.carte.push({id:uid(),mad,usdt,taux,date,client,note,by:user,addedAt:now()});
-  log({type:'db',grp:'Carte',client,desc:`Débit carte — ${client||note||''}`,amount:mad,dir:'−'});
+  db.carte.push({id:uid(),mad,usdt,taux,date,tag,by:user,addedAt:now()});
+  log({type:'db',grp:'Carte',desc:`Débit carte — ${tag} — ${usdt} USDT → ${fmt(mad)}`,amount:usdt,dir:'−'});
   await save();
   closeM('M_carte');
   renderCarte();
