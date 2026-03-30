@@ -218,7 +218,7 @@ tr:hover td{background:var(--s2)}
       <div class="lb-logo">Déclic <em>//</em> Media</div>
       <h1 class="lb-h">Media<br/><b>Tracker</b></h1>
       <p class="lb-sub">Gestion des flux budgets & consos</p>
-      <form id="loginForm" onsubmit="doLogin(event)" autocomplete="on" action="#" method="post">
+      <form id="loginForm" onsubmit="doLogin(event);return false;" autocomplete="on">
         <div class="fl"><label>Profil</label>
           <select id="loginRole" name="role" autocomplete="username">
             <option value="admin">Admin — Digital Lead</option>
