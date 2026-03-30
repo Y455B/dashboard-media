@@ -307,6 +307,7 @@ tr:hover td{background:var(--s2)}
             <option value="approvisionne">Approvisionné</option>
             <option value="encours">En cours</option>
           </select>
+          <button class="btn btn-acc" id="btnAddConsoDoc" onclick="openBudModal()">+ Dossier</button>
         </div>
       </div>
       <div id="consoList"></div>
@@ -414,6 +415,9 @@ tr:hover td{background:var(--s2)}
           <label>Ligne plan média liée (optionnel)</label>
           <select id="fBPMLine"><option value="">— Aucune —</option></select>
         </div>
+        <div class="fc" style="margin-bottom:4px"><div style="font-family:var(--mono);font-size:10px;color:var(--t3);text-transform:uppercase;letter-spacing:.08em">Barème par format (MAD)</div></div>
+        <div class="frow"><label>Instagram — IN</label><input type="number" id="fBBaremeIN" placeholder="1500" step="50"/></div>
+        <div class="frow"><label>Facebook — FB</label><input type="number" id="fBBaremeFB" placeholder="450" step="50"/></div>
         <div class="fc frow"><label>Note</label><input id="fBN" placeholder="Ref devis, contexte…"/></div>
       </div>
     </div>
@@ -588,6 +592,40 @@ tr:hover td{background:var(--s2)}
   </div>
 </div>
 
+<!-- MODAL: Ajouter post -->
+<div class="ov" id="M_post">
+  <div class="modal">
+    <div class="mh"><h3>Nouveau post sponsorisé</h3><button class="mhc" onclick="closeM('M_post')">×</button></div>
+    <div class="mb">
+      <div style="font-family:var(--mono);font-size:11px;color:var(--t2);margin-bottom:1rem" id="mPostDesc"></div>
+      <div class="calc-box" id="mPostBareme" style="margin-bottom:1rem"></div>
+      <div class="fg">
+        <div class="fc frow"><label>Nom de campagne (console Meta)</label>
+          <input id="fPostCampagne" placeholder="Campagne_FSO_Awareness_Mai25…"/>
+        </div>
+        <div class="frow"><label>Format</label>
+          <select id="fPostFormat" onchange="fillPostMontant()">
+            <option value="">— Choisir —</option>
+            <option value="IN">Instagram (IN)</option>
+            <option value="FB">Facebook (FB)</option>
+            <option value="custom">Montant libre</option>
+          </select>
+        </div>
+        <div class="frow"><label>Montant (MAD)</label>
+          <input type="number" id="fPostMontant" placeholder="1500"/>
+        </div>
+        <div class="fc frow"><label>Date</label>
+          <input type="date" id="fPostDate"/>
+        </div>
+      </div>
+    </div>
+    <div class="mf">
+      <button class="btn btn-ghost" onclick="closeM('M_post')">Annuler</button>
+      <button class="btn btn-acc" onclick="savePost()">Ajouter</button>
+    </div>
+  </div>
+</div>
+
 <!-- MODAL: Lier PM -->
 <div class="ov" id="M_link">
   <div class="modal">
@@ -710,6 +748,8 @@ function setupUI(){
   const grpAct=document.getElementById('grpActions');
   if(btnBud) btnBud.style.display=canEdit()?'':'none';
   if(btnPlan) btnPlan.style.display=canEdit()?'':'none';
+  const btnConsoDoc=document.getElementById('btnAddConsoDoc');
+  if(btnConsoDoc) btnConsoDoc.style.display=canEdit()?'':'none';
   if(grpAct) grpAct.innerHTML=isAdmin()?'<button class="btn btn-acc" onclick="openGrpModal()">+ Groupe</button>':'';
   document.getElementById('dashDate').textContent=new Date().toLocaleDateString('fr-FR',{weekday:'long',year:'numeric',month:'long',day:'numeric'});
   buildColorPick();
@@ -918,6 +958,10 @@ function openBudModal(id){
     document.getElementById('fBF').value=b.fraisPct;
     document.getElementById('fBS').value=b.status;
     document.getElementById('fBN').value=b.note||'';
+    const bIN=document.getElementById('fBBaremeIN');
+    const bFB=document.getElementById('fBBaremeFB');
+    if(bIN) bIN.value=(b.bareme&&b.bareme.IN)||'';
+    if(bFB) bFB.value=(b.bareme&&b.bareme.FB)||'';
     updateBudPMLines();
     document.getElementById('fBPMLine').value=b.pmLineId||'';
     calcNet();
@@ -938,15 +982,18 @@ function saveBud(){
   const status=document.getElementById('fBS').value;
   const note=document.getElementById('fBN').value;
   const pmLineId=document.getElementById('fBPMLine')?.value||'';
+  const baremeIN=parseFloat(document.getElementById('fBBaremeIN')?.value)||0;
+  const baremeFB=parseFloat(document.getElementById('fBBaremeFB')?.value)||0;
+  const bareme={IN:baremeIN,FB:baremeFB};
   if(!devis)return alert('Montant devis requis');
   if(!groupId||!db.groups.find(g=>g.id===groupId))return alert('Sélectionne un groupe');
   const netAmt=net(devis,fraisPct);
   if(eBudId){
     const idx=db.budgets.findIndex(b=>b.id===eBudId);
-    db.budgets[idx]={...db.budgets[idx],groupId,client,canal,period,devis,fraisPct,netAmt,status,note,pmLineId};
+    db.budgets[idx]={...db.budgets[idx],groupId,client,canal,period,devis,fraisPct,netAmt,status,note,pmLineId,bareme};
     log({type:'st',grp:gName(groupId),client,desc:`Dossier modifié — ${canal}`});
   }else{
-    db.budgets.push({id:uid(),groupId,client,canal,period,devis,fraisPct,netAmt,conso:0,status,note:notes,pmLineId,createdAt:now()});
+    db.budgets.push({id:uid(),groupId,client,canal,period,devis,fraisPct,netAmt,conso:0,posts:[],status,note:notes,pmLineId,bareme,createdAt:now()});
     log({type:'nw',grp:gName(groupId),client,desc:`Nouveau dossier — ${client} · ${canal} · ${period} · devis ${fmt(devis)} · net ${fmt(netAmt)}`});
   }
   save();closeM('M_bud');populateF();renderBudgets();renderDash();
@@ -997,13 +1044,13 @@ function renderConso(){
     return `<div class="cc">
       <div class="cc-head">
         <div>
-          <div class="cc-name">${dot(b.groupId)}${b.client} — ${b.canal}${b.period?' <span style="font-family:var(--mono);font-size:11px;color:var(--acc);font-weight:400;margin-left:4px">['+b.period+']</span>':''}</div>
+          <div class="cc-name">${dot(b.groupId)}${b.client} — ${b.canal}${b.period?` <span style="font-family:var(--mono);font-size:11px;color:var(--acc);font-weight:400;margin-left:4px">[${b.period}]</span>`:''}</div>
           <div class="cc-meta">${gName(b.groupId)} · <span class="badge ${SC[b.status]}">${SL[b.status]}</span></div>
         </div>
         <div style="display:flex;gap:6px;flex-wrap:wrap">
           <button class="btn btn-xs btn-ghost" onclick="openConsoModal('${b.id}')" ${dis}>Mettre à jour</button>
           <button class="btn btn-xs btn-ghost" onclick="openLinkPMModal('${b.id}')" ${dis} title="Lier à une ligne de plan média">Lier PM</button>
-          <button class="btn btn-xs btn-acc" onclick="openBudModalFromConso('${b.groupId}','${b.client}')" ${dis} title="Ajouter un nouveau dossier">+ Dossier</button>
+
           ${isAdmin()?`<button class="btn btn-xs btn-red" onclick="askDel('budget','${b.id}')">Supprimer</button>`:''}
         </div>
       </div>
@@ -1017,6 +1064,33 @@ function renderConso(){
         <div class="mono tdim" style="font-size:11px;flex-shrink:0">${pct}% brûlé</div>
       </div>
       ${getPMLineBadge(b.pmLineId)}
+      ${isPostsCanal(b.pmLineId) ? `
+      <div style="margin-top:12px;border-top:1px solid var(--b1);padding-top:10px">
+        ${(b.bareme&&(b.bareme.IN||b.bareme.FB))?`<div style="font-family:var(--mono);font-size:10px;color:var(--t3);margin-bottom:8px">Barème — ${[b.bareme.IN?'IN : '+fmt(b.bareme.IN):'',b.bareme.FB?'FB : '+fmt(b.bareme.FB):''].filter(Boolean).join(' · ')}</div>`:''}
+        <div style="display:flex;align-items:center;justify-content:space-between;margin-bottom:8px">
+          <span style="font-family:var(--mono);font-size:10px;color:var(--t3);text-transform:uppercase;letter-spacing:.06em">Posts sponsorisés (${(b.posts||[]).length}) — ${fmt((b.posts||[]).reduce((s,p)=>s+p.montant,0))}</span>
+          ${canEdit()?`<button class="btn btn-xs btn-acc" onclick="addPost('${b.id}')" ${dis}>+ Post</button>`:''}
+        </div>
+        ${(b.posts||[]).length ? `
+        <table style="width:100%;border-collapse:collapse">
+          <thead><tr>
+            <th style="text-align:left;padding:5px 8px;font-family:var(--mono);font-size:10px;color:var(--t3);border-bottom:1px solid var(--b1)">CAMPAGNE META</th>
+            <th style="text-align:right;padding:5px 8px;font-family:var(--mono);font-size:10px;color:var(--t3);border-bottom:1px solid var(--b1)">MONTANT</th>
+            <th style="text-align:left;padding:5px 8px;font-family:var(--mono);font-size:10px;color:var(--t3);border-bottom:1px solid var(--b1)">DATE</th>
+            ${canEdit()?'<th style="border-bottom:1px solid var(--b1)"></th>':''}
+          </tr></thead>
+          <tbody>
+            ${(b.posts||[]).map((p,i)=>`<tr>
+              <td style="padding:7px 8px;border-bottom:1px solid var(--b1);font-size:12px;font-weight:500">
+                ${p.format?`<span style="font-family:var(--mono);font-size:10px;padding:1px 7px;border-radius:100px;background:${p.format==='IN'?'rgba(91,156,246,.15)':'rgba(96,208,128,.12)'};color:${p.format==='IN'?'var(--blu)':'var(--grn)'};margin-right:6px">${p.format}</span>`:''}${p.campagne||'—'}
+              </td>
+              <td style="padding:7px 8px;border-bottom:1px solid var(--b1);font-family:var(--mono);font-size:12px;color:var(--acc);text-align:right">${fmt(p.montant)}</td>
+              <td style="padding:7px 8px;border-bottom:1px solid var(--b1);font-family:var(--mono);font-size:11px;color:var(--t3)">${p.date||'—'}</td>
+              ${canEdit()?`<td style="padding:5px 8px;border-bottom:1px solid var(--b1)"><button class="btn btn-xs btn-red" onclick="removePost('${b.id}',${i})">✕</button></td>`:''}
+            </tr>`).join('')}
+          </tbody>
+        </table>` : '<div style="font-family:var(--mono);font-size:11px;color:var(--t3)">Aucun post — clique sur + Post pour commencer</div>'}
+      </div>` : ''}
     </div>`;
   }).join('');
 }
@@ -1413,6 +1487,79 @@ function saveLinkPM(){
   b.pmLineId=document.getElementById('fLinkPM').value;
   log({type:'st',grp:gName(b.groupId),client:b.client,desc:`Lien PM mis à jour — ${b.canal}`});
   save();closeM('M_link');renderConso();
+}
+
+// ── POSTS SPONSORISES ────────────────────────────────────────────────
+const PAID_CANALS=['Meta Ads','Google Ads','TikTok Ads','LinkedIn Ads','Programmatique'];
+function isPostsCanal(pmLineId){
+  if(!pmLineId) return false;
+  const parts=pmLineId.split('__');
+  const plan=db.plans.find(p=>p.id===parts[0]);
+  if(!plan) return false;
+  const line=plan.lines[parseInt(parts[1])];
+  if(!line) return false;
+  return PAID_CANALS.includes(line.canal);
+}
+
+let pendingPostBudId=null;
+function addPost(budId){
+  pendingPostBudId=budId;
+  const b=db.budgets.find(x=>x.id===budId);
+  const bar=b.bareme||{};
+  // Show barème recap
+  const barBox=document.getElementById('mPostBareme');
+  if(bar.IN||bar.FB){
+    barBox.style.display='block';
+    barBox.innerHTML=`Barème — ${[bar.IN?`IN : <strong>${fmt(bar.IN)}</strong>`:'',bar.FB?`FB : <strong>${fmt(bar.FB)}</strong>`:''].filter(Boolean).join(' &nbsp;|&nbsp; ')}`;
+  } else {
+    barBox.style.display='none';
+  }
+  document.getElementById('mPostDesc').textContent=
+    `${b.client}${b.period?' ['+b.period+']':''} — ${b.canal}`;
+  document.getElementById('fPostCampagne').value='';
+  document.getElementById('fPostFormat').value='';
+  document.getElementById('fPostMontant').value='';
+  document.getElementById('fPostDate').value=new Date().toISOString().split('T')[0];
+  openM('M_post');
+}
+
+function fillPostMontant(){
+  const fmt2=document.getElementById('fPostFormat').value;
+  if(!fmt2||fmt2==='custom') return;
+  const b=db.budgets.find(x=>x.id===pendingPostBudId);
+  const bar=b?.bareme||{};
+  const val=bar[fmt2]||0;
+  if(val) document.getElementById('fPostMontant').value=val;
+}
+
+async function savePost(){
+  const b=db.budgets.find(x=>x.id===pendingPostBudId);
+  const campagne=document.getElementById('fPostCampagne').value.trim();
+  const format=document.getElementById('fPostFormat').value||'';
+  const montant=parseFloat(document.getElementById('fPostMontant').value)||0;
+  const date=document.getElementById('fPostDate').value;
+  if(!campagne) return alert('Nom de campagne requis');
+  if(!montant)  return alert('Montant requis');
+  if(!b.posts) b.posts=[];
+  b.posts.push({campagne,format,montant,date,addedBy:user,addedAt:now()});
+  // Update conso total = sum of all posts
+  b.conso=b.posts.reduce((s,p)=>s+p.montant,0);
+  log({type:'db',grp:gName(b.groupId),client:b.client,
+    desc:`Post ajouté — ${campagne}`,amount:montant,dir:'+'});
+  await save();
+  closeM('M_post');
+  renderConso();
+  renderDash();
+}
+
+async function removePost(budId,idx){
+  const b=db.budgets.find(x=>x.id===budId);
+  if(!b||!b.posts) return;
+  b.posts.splice(idx,1);
+  b.conso=b.posts.reduce((s,p)=>s+p.montant,0);
+  await save();
+  renderConso();
+  renderDash();
 }
 
 function openM(id){document.getElementById(id).classList.add('on');}
