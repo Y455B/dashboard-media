@@ -894,14 +894,14 @@ function openGrpModal(id){
   }else{document.getElementById('fGN').value='';document.getElementById('fGC').value='';}
   openM('M_grp');
 }
-function saveGrp(){
+async function saveGrp(){
   const name=document.getElementById('fGN').value.trim();
   const clients=document.getElementById('fGC').value.split('\n').map(s=>s.trim()).filter(Boolean);
   if(!name)return alert('Nom requis');
   if(!clients.length)return alert('Au moins un client requis');
   if(eGrpId){const idx=db.groups.findIndex(g=>g.id===eGrpId);db.groups[idx]={...db.groups[idx],name,clients,color:selColor};log({type:'st',grp:name,desc:'Groupe modifié'});}
   else{db.groups.push({id:uid(),name,clients,color:selColor});log({type:'nw',grp:name,desc:`Créé — ${clients.join(', ')}`});}
-  save();closeM('M_grp');populateF();renderGroups();
+  await save();closeM('M_grp');populateF();renderGroups();
 }
 
 // BUDGETS
@@ -972,7 +972,7 @@ function openBudModal(id){
   }
   openM('M_bud');
 }
-function saveBud(){
+async function saveBud(){
   const groupId=document.getElementById('fBG').value;
   const client=document.getElementById('fBC').value;
   const canal=document.getElementById('fBCan').value;
@@ -993,10 +993,10 @@ function saveBud(){
     db.budgets[idx]={...db.budgets[idx],groupId,client,canal,period,devis,fraisPct,netAmt,status,note,pmLineId,bareme};
     log({type:'st',grp:gName(groupId),client,desc:`Dossier modifié — ${canal}`});
   }else{
-    db.budgets.push({id:uid(),groupId,client,canal,period,devis,fraisPct,netAmt,conso:0,posts:[],status,note:notes,pmLineId,bareme,createdAt:now()});
+    db.budgets.push({id:uid(),groupId,client,canal,period,devis,fraisPct,netAmt,conso:0,posts:[],status,note,pmLineId,bareme,createdAt:now()});
     log({type:'nw',grp:gName(groupId),client,desc:`Nouveau dossier — ${client} · ${canal} · ${period} · devis ${fmt(devis)} · net ${fmt(netAmt)}`});
   }
-  save();closeM('M_bud');populateF();renderBudgets();renderDash();
+  await save();closeM('M_bud');populateF();renderBudgets();renderDash();
 }
 function renderBudgets(){
   const gf=document.getElementById('budGF').value;
@@ -1111,7 +1111,7 @@ function toggleConsoMode(){
   if(mode==='delta'&&b){box.style.display='block';box.innerHTML=`Déjà dépensé : <strong>${fmt(b.conso)}</strong><br>Nouveau total après ajout : <strong>sera calculé à la saisie</strong>`;}
   else{box.style.display='none';}
 }
-function saveConso(){
+async function saveConso(){
   const b=db.budgets.find(x=>x.id===pConsoId);
   const mode=document.getElementById('fCM').value;
   const amt=parseFloat(document.getElementById('fCA').value)||0;
@@ -1121,7 +1121,7 @@ function saveConso(){
   b.conso=mode==='cumul'?Math.max(0,amt):Math.max(0,b.conso+amt);
   const delta=b.conso-old;
   log({type:'db',grp:gName(b.groupId),client:b.client,desc:`Conso maj — ${b.canal}${note?' — '+note:''}`,amount:Math.abs(delta),dir:delta>=0?'+':'−'});
-  save();closeM('M_conso');renderConso();renderDash();
+  await save();closeM('M_conso');renderConso();renderDash();
 }
 
 // STATUS
@@ -1134,12 +1134,12 @@ function openStatusModal(id){
   document.getElementById('mStPipe').innerHTML=SO.map(s=>`<div class="pnode ${s===b.status?'active':SO.indexOf(s)<SO.indexOf(b.status)?'done':''}">${SL[s]}</div>${s!=='fini'?'<span class="parr">→</span>':''}`).join('');
   openM('M_status');
 }
-function saveStatus(){
+async function saveStatus(){
   const b=db.budgets.find(x=>x.id===pStatusId);
   const old=b.status;b.status=document.getElementById('fNS').value;
   const note=document.getElementById('fSN').value;
   log({type:'st',grp:gName(b.groupId),client:b.client,desc:`Statut : ${SL[old]} → ${SL[b.status]}${note?' ('+note+')':''}`});
-  save();closeM('M_status');renderBudgets();renderDash();renderConso();
+  await save();closeM('M_status');renderBudgets();renderDash();renderConso();
 }
 
 // HISTORY
@@ -1174,7 +1174,7 @@ function askDel(type,id){
   document.getElementById('mDelDesc').textContent=msgs[type]();
   openM('M_del');
 }
-function confirmDel(){
+async function confirmDel(){
   if(pDelType==='group'){
     const g=db.groups.find(x=>x.id===pDelId);
     log({type:'st',grp:g?.name||'',desc:'Groupe supprimé'});
@@ -1189,7 +1189,7 @@ function confirmDel(){
     log({type:'st',grp:gName(p?.groupId),client:p?.client,desc:'Plan média supprimé'});
     db.plans=db.plans.filter(x=>x.id!==pDelId);
   }
-  save();closeM('M_del');populateF();renderGroups();renderBudgets();renderDash();
+  await save();closeM('M_del');populateF();renderGroups();renderBudgets();renderDash();
 }
 
 
@@ -1313,7 +1313,7 @@ function updatePlanTotal(){
   box.innerHTML=`Budget global : <strong>${fmt(budget)}</strong> &nbsp;|&nbsp; Alloué : <strong style="color:var(--acc)">${fmt(total)}</strong> &nbsp;|&nbsp; Reste : <strong style="color:${reste<0?'var(--red)':'var(--grn)'}">${fmt(reste)}</strong>`;
 }
 
-function savePlan(){
+async function savePlan(){
   const groupId=document.getElementById('fPlanG').value;
   const client=document.getElementById('fPlanC').value;
   const period=document.getElementById('fPlanPer').value;
@@ -1326,7 +1326,7 @@ function savePlan(){
   if(ePlanId){const idx=db.plans.findIndex(x=>x.id===ePlanId);db.plans[idx]=plan;}
   else{db.plans.push(plan);}
   log({type:'nw',grp:gName(groupId),client,desc:`Plan média ${ePlanId?'modifié':'créé'} — ${period} — ${planLines.length} ligne(s)`});
-  save();closeM('M_plan');renderPlans();
+  await save();closeM('M_plan');renderPlans();
 }
 
 // ── PLAN VIEW / EXPORT ─────────────────────────────────────────────────
@@ -1482,11 +1482,11 @@ function openLinkPMModal(budId){
   document.getElementById('mLinkDesc').textContent=`${b.client} — ${b.canal}${b.period?' ['+b.period+']':''}`;
   openM('M_link');
 }
-function saveLinkPM(){
+async function saveLinkPM(){
   const b=db.budgets.find(x=>x.id===pendingLinkBudId);
   b.pmLineId=document.getElementById('fLinkPM').value;
   log({type:'st',grp:gName(b.groupId),client:b.client,desc:`Lien PM mis à jour — ${b.canal}`});
-  save();closeM('M_link');renderConso();
+  await save();closeM('M_link');renderConso();
 }
 
 // ── POSTS SPONSORISES ────────────────────────────────────────────────
