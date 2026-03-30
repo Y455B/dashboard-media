@@ -373,7 +373,7 @@ tr:hover td{background:var(--s2)}
       <div class="card">
         <div class="tbl-wrap">
           <table><thead><tr>
-            <th>Date</th><th>Client / Dossier</th><th>Montant (MAD)</th><th>Montant (€)</th><th>Note</th><th>Saisi par</th><th></th>
+            <th>Date</th><th>Client / Dossier</th><th>Montant (MAD)</th><th>Montant (USDT)</th><th>Note</th><th>Saisi par</th><th></th>
           </tr></thead>
           <tbody id="carteTbody"></tbody>
         </table></div>
@@ -624,13 +624,13 @@ tr:hover td{background:var(--s2)}
           <input type="date" id="fCarteDate"/>
         </div>
         <div class="frow"><label>Montant débité (MAD)</label>
-          <input type="number" id="fCarteMAD" placeholder="1 500" oninput="calcCarteEur()"/>
+          <input type="number" id="fCarteMAD" placeholder="1 500" oninput="calcCarteUSDT()"/>
         </div>
-        <div class="frow"><label>Taux de change (MAD/€)</label>
-          <input type="number" id="fCarteTaux" placeholder="10.8" step="0.1" value="10.8" oninput="calcCarteEur()"/>
+        <div class="frow"><label>Taux de change (MAD/USDT)</label>
+          <input type="number" id="fCarteTaux" placeholder="10.8" step="0.01" value="10.8" oninput="calcCarteUSDT()"/>
         </div>
-        <div class="frow"><label>Équivalent (€)</label>
-          <input type="number" id="fCarteEUR" placeholder="calculé auto" readonly style="opacity:.6"/>
+        <div class="frow"><label>Équivalent (USDT)</label>
+          <input type="number" id="fCarteMAD2" placeholder="calculé auto" readonly style="opacity:.6"/>
         </div>
         <div class="fc frow"><label>Client / Dossier concerné</label>
           <input id="fCarteClient" placeholder="FSO — Meta Ads Q1…"/>
@@ -1721,14 +1721,14 @@ function renderCarte(){
   if(!canSeeCarte()){ document.getElementById('P_carte').innerHTML='<div class="empty"><div class="ei">🔒</div><div class="et">Accès restreint</div></div>'; return; }
   const entries=db.carte||[];
   const totalMAD=entries.reduce((s,e)=>s+e.mad,0);
-  const totalEUR=entries.reduce((s,e)=>s+e.eur,0);
+  const totalUSDT=entries.reduce((s,e)=>s+e.usdt,0);
   const thisMonth=new Date().toISOString().slice(0,7);
   const monthEntries=entries.filter(e=>e.date&&e.date.startsWith(thisMonth));
   const monthMAD=monthEntries.reduce((s,e)=>s+e.mad,0);
 
   document.getElementById('carteKpis').innerHTML=`
     <div class="kpi hl"><div class="kpi-l">Total débité (MAD)</div><div class="kpi-v">${fmt(totalMAD)}</div><div class="kpi-s">${entries.length} opération(s)</div></div>
-    <div class="kpi"><div class="kpi-l">Total débité (€)</div><div class="kpi-v" style="color:var(--amb)">${Math.round(totalEUR).toLocaleString('fr-MA')} €</div></div>
+    <div class="kpi"><div class="kpi-l">Total (USDT)</div><div class="kpi-v" style="color:var(--amb)">${Math.round(totalUSDT*100)/100} USDT</div></div>
     <div class="kpi"><div class="kpi-l">Ce mois</div><div class="kpi-v" style="color:var(--blu)">${fmt(monthMAD)}</div><div class="kpi-s">${monthEntries.length} opération(s)</div></div>
   `;
 
@@ -1742,7 +1742,7 @@ function renderCarte(){
     <td class="mono tdim">${fD(e.date)}</td>
     <td style="font-weight:500">${e.client||'—'}</td>
     <td class="mono" style="color:var(--red)">−${fmt(e.mad)}</td>
-    <td class="mono tdim">${Math.round(e.eur).toLocaleString('fr-MA')} €</td>
+    <td class="mono tdim">${Math.round(e.usdt*100)/100} USDT</td>
     <td class="dim" style="font-size:12px">${e.note||'—'}</td>
     <td class="mono tdim" style="font-size:11px">${e.by||'—'}</td>
     <td>${isAdmin()?`<button class="btn btn-xs btn-red" onclick="askDel('carte','${e.id}')">✕</button>`:''}</td>
@@ -1752,29 +1752,29 @@ function renderCarte(){
 function openCarteModal(){
   document.getElementById('fCarteDate').value=new Date().toISOString().split('T')[0];
   document.getElementById('fCarteMAD').value='';
-  document.getElementById('fCarteEUR').value='';
+  document.getElementById('fCarteMAD2').value='';
   document.getElementById('fCarteClient').value='';
   document.getElementById('fCarteNote').value='';
   document.getElementById('fCarteTaux').value='10.8';
   openM('M_carte');
 }
 
-function calcCarteEur(){
+function calcCarteUSDT(){
   const mad=parseFloat(document.getElementById('fCarteMAD').value)||0;
   const taux=parseFloat(document.getElementById('fCarteTaux').value)||10.8;
-  document.getElementById('fCarteEUR').value=mad>0?Math.round(mad/taux*100)/100:'';
+  document.getElementById('fCarteMAD2').value=mad>0?Math.round(mad/taux*100)/100:'';
 }
 
 async function saveCarte(){
   const mad=parseFloat(document.getElementById('fCarteMAD').value)||0;
   const taux=parseFloat(document.getElementById('fCarteTaux').value)||10.8;
-  const eur=mad>0?Math.round(mad/taux*100)/100:0;
+  const usdt=mad>0?Math.round(mad/taux*100)/100:0;
   const date=document.getElementById('fCarteDate').value;
   const client=document.getElementById('fCarteClient').value;
   const note=document.getElementById('fCarteNote').value;
   if(!mad)return alert('Montant requis');
   if(!db.carte)db.carte=[];
-  db.carte.push({id:uid(),mad,eur,taux,date,client,note,by:user,addedAt:now()});
+  db.carte.push({id:uid(),mad,usdt,taux,date,client,note,by:user,addedAt:now()});
   log({type:'db',grp:'Carte',client,desc:`Débit carte — ${client||note||''}`,amount:mad,dir:'−'});
   await save();
   closeM('M_carte');
