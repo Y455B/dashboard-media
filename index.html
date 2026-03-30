@@ -1789,12 +1789,12 @@ function calcCarteUSDT(){
 }
 
 async function saveCarte(){
-  const mad=parseFloat(document.getElementById('fCarteUSDT').value)||0;
+  const usdt=parseFloat(document.getElementById('fCarteUSDT').value)||0;
   const taux=parseFloat(document.getElementById('fCarteTaux').value)||10.8;
-  const usdt=mad>0?Math.round(mad/taux*100)/100:0;
+  const mad=usdt>0?Math.round(usdt*taux):0;
   const date=document.getElementById('fCarteDate').value;
   const tag=document.getElementById('fCarteTag').value;
-  if(!mad)return alert('Montant requis');
+  if(!usdt)return alert('Montant requis');
   if(!tag)return alert('Sélectionne une catégorie');
   if(!db.carte)db.carte=[];
   db.carte.push({id:uid(),mad,usdt,taux,date,tag,by:user,addedAt:now()});
