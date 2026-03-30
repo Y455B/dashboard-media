@@ -62,6 +62,7 @@ select option{background:var(--s2)}
 .rb-admin{background:var(--acc2);color:var(--acc)}
 .rb-traffic{background:var(--blu2);color:var(--blu)}
 .rb-finance{background:rgba(255,255,255,.06);color:var(--t2)}
+.rb-partenaire{background:rgba(240,160,64,.12);color:var(--amb)}
 .ns{font-family:var(--mono);font-size:10px;color:var(--t3);letter-spacing:.12em;text-transform:uppercase;padding:.75rem 1.25rem .25rem}
 .ni{display:flex;align-items:center;gap:8px;padding:7px 1.25rem;font-size:13px;color:var(--t2);cursor:pointer;transition:all .12s;border-left:2px solid transparent}
 .ni:hover{color:var(--t1);background:var(--s2)}
@@ -223,6 +224,7 @@ tr:hover td{background:var(--s2)}
             <option value="admin">Admin — Digital Lead</option>
             <option value="traffic">Traffic Manager</option>
             <option value="finance">Finance (lecture seule)</option>
+            <option value="partenaire">Partenaire carte</option>
           </select>
         </div>
         <div class="fl"><label>Mot de passe</label>
@@ -253,6 +255,7 @@ tr:hover td{background:var(--s2)}
     <div class="ni" id="ni-groups"  onclick="nav('groups')"><svg viewBox="0 0 16 16" fill="none" stroke="currentColor" stroke-width="1.5"><circle cx="8" cy="5" r="3"/><path d="M2 14c0-3.3 2.7-6 6-6s6 2.7 6 6"/></svg>Groupes clients</div>
     <div class="ni" id="ni-conso"   onclick="nav('conso')"><svg viewBox="0 0 16 16" fill="none" stroke="currentColor" stroke-width="1.5"><circle cx="8" cy="8" r="6"/><path d="M8 5v3.5l2.5 1.5"/></svg>Consos live</div>
     <div class="ns">Gestion</div>
+    <div class="ni" id="ni-carte" onclick="nav('carte')"><svg viewBox="0 0 16 16" fill="none" stroke="currentColor" stroke-width="1.5"><rect x="1" y="3" width="14" height="10" rx="1.5"/><path d="M1 7h14M4 10h3"/></svg>Carte partenaire</div>
     <div class="ni" id="ni-budgets" onclick="nav('budgets')"><svg viewBox="0 0 16 16" fill="none" stroke="currentColor" stroke-width="1.5"><rect x="1" y="3" width="14" height="10" rx="1.5"/><path d="M1 6h14"/></svg>Dossiers budget</div>
     <div class="ni" id="ni-plans"   onclick="nav('plans')"><svg viewBox="0 0 16 16" fill="none" stroke="currentColor" stroke-width="1.5"><rect x="2" y="2" width="12" height="3" rx="1"/><rect x="2" y="7" width="8" height="2" rx="1"/><rect x="2" y="11" width="10" height="2" rx="1"/></svg>Plans média</div>
     <div class="ni" id="ni-history" onclick="nav('history')"><svg viewBox="0 0 16 16" fill="none" stroke="currentColor" stroke-width="1.5"><path d="M2 8h12M8 2l6 6-6 6"/></svg>Historique</div>
@@ -356,6 +359,25 @@ tr:hover td{background:var(--s2)}
         <div class="ph-r" id="plansActions"></div>
       </div>
       <div id="plansList"></div>
+    </div>
+
+    <!-- CARTE PARTENAIRE -->
+    <div class="page" id="P_carte">
+      <div class="ph">
+        <div class="ph-l"><h1>Carte partenaire</h1><p>Suivi des débits carte en temps réel</p></div>
+        <div class="ph-r">
+          <button class="btn btn-acc" id="btnAddCarte" onclick="openCarteModal()">+ Débit carte</button>
+        </div>
+      </div>
+      <div class="kpi-row" id="carteKpis"></div>
+      <div class="card">
+        <div class="tbl-wrap">
+          <table><thead><tr>
+            <th>Date</th><th>Client / Dossier</th><th>Montant (MAD)</th><th>Montant (€)</th><th>Note</th><th>Saisi par</th><th></th>
+          </tr></thead>
+          <tbody id="carteTbody"></tbody>
+        </table></div>
+      </div>
     </div>
 
     <!-- HISTORIQUE -->
@@ -592,6 +614,39 @@ tr:hover td{background:var(--s2)}
   </div>
 </div>
 
+<!-- MODAL: Débit carte -->
+<div class="ov" id="M_carte">
+  <div class="modal">
+    <div class="mh"><h3>Nouveau débit carte</h3><button class="mhc" onclick="closeM('M_carte')">×</button></div>
+    <div class="mb">
+      <div class="fg">
+        <div class="frow"><label>Date du débit</label>
+          <input type="date" id="fCarteDate"/>
+        </div>
+        <div class="frow"><label>Montant débité (MAD)</label>
+          <input type="number" id="fCarteMAD" placeholder="1 500" oninput="calcCarteEur()"/>
+        </div>
+        <div class="frow"><label>Taux de change (MAD/€)</label>
+          <input type="number" id="fCarteTaux" placeholder="10.8" step="0.1" value="10.8" oninput="calcCarteEur()"/>
+        </div>
+        <div class="frow"><label>Équivalent (€)</label>
+          <input type="number" id="fCarteEUR" placeholder="calculé auto" readonly style="opacity:.6"/>
+        </div>
+        <div class="fc frow"><label>Client / Dossier concerné</label>
+          <input id="fCarteClient" placeholder="FSO — Meta Ads Q1…"/>
+        </div>
+        <div class="fc frow"><label>Note</label>
+          <input id="fCarteNote" placeholder="Référence, détail du paiement…"/>
+        </div>
+      </div>
+    </div>
+    <div class="mf">
+      <button class="btn btn-ghost" onclick="closeM('M_carte')">Annuler</button>
+      <button class="btn btn-acc" onclick="saveCarte()">Enregistrer</button>
+    </div>
+  </div>
+</div>
+
 <!-- MODAL: Nouvelle conso -->
 <div class="ov" id="M_newconso">
   <div class="modal">
@@ -676,7 +731,7 @@ tr:hover td{background:var(--s2)}
 </div>
 
 <script>
-const PWS={admin:'declic2025',traffic:'traffic2025',finance:'finance2025'};
+const PWS={admin:'declic2025',traffic:'traffic2025',finance:'finance2025',partenaire:'carte2025'};
 const COLORS=['#5b9cf6','#60d080','#f06060','#c8f060','#f0a040','#c084fc','#f472b6','#34d399','#fb923c','#a3e635'];
 const SL={attente:'En attente',incoming:'Incoming',approvisionne:'Approvisionné',encours:'En cours',fini:'Terminé'};
 const SC={attente:'b-att',incoming:'b-inc',approvisionne:'b-app',encours:'b-enc',fini:'b-fin'};
@@ -684,7 +739,7 @@ const SO=['attente','incoming','approvisionne','encours','fini'];
 const SK='declic_mt_v4';
 
 let role='',user='';
-let db={groups:[],budgets:[],history:[],plans:[]};
+let db={groups:[],budgets:[],history:[],plans:[],carte:[]};
 let eGrpId=null,eBudId=null,pDelType=null,pDelId=null,pStatusId=null,pConsoId=null;
 let selColor=COLORS[0];
 
@@ -697,7 +752,7 @@ async function load(){
     const r=await fetch('/api/db?action=get&key='+REDIS_KEY);
     if(!r.ok) throw new Error('HTTP '+r.status);
     const data=await r.json();
-    if(data.value){db=data.value;if(!db.plans)db.plans=[];}
+    if(data.value){db=data.value;if(!db.plans)db.plans=[];if(!db.carte)db.carte=[];}
     setRedisStatus(true);
   }catch(e){
     console.warn('Redis load failed',e);
@@ -734,7 +789,7 @@ async function doLogin(){
   if(p===PWS[r]){
     errEl.style.display='none';
     role=r;
-    user=r==='admin'?'Digital Lead':r==='traffic'?'Traffic':'Finance';
+    user=r==='admin'?'Digital Lead':r==='traffic'?'Traffic':r==='partenaire'?'Partenaire':'Finance';
     localStorage.setItem('declic_session',JSON.stringify({role,user}));
     await load();
     document.getElementById('S_login').classList.remove('on');
@@ -765,8 +820,8 @@ function isAdmin(){return role==='admin';}
 
 function setupUI(){
   const b=document.getElementById('sideBadge');
-  b.className='role-badge '+{admin:'rb-admin',traffic:'rb-traffic',finance:'rb-finance'}[role];
-  b.textContent={admin:'Admin',traffic:'Traffic',finance:'Finance'}[role];
+  b.className='role-badge '+{admin:'rb-admin',traffic:'rb-traffic',finance:'rb-finance',partenaire:'rb-partenaire'}[role];
+  b.textContent={admin:'Admin',traffic:'Traffic',finance:'Finance',partenaire:'Partenaire'}[role];
   document.getElementById('sideUser').textContent=user;
   const btnBud=document.getElementById('btnAddBud');
   const btnPlan=document.getElementById('btnAddPlan');
@@ -778,6 +833,18 @@ function setupUI(){
   if(grpAct) grpAct.innerHTML=isAdmin()?'<button class="btn btn-acc" onclick="openGrpModal()">+ Groupe</button>':'';
   document.getElementById('dashDate').textContent=new Date().toLocaleDateString('fr-FR',{weekday:'long',year:'numeric',month:'long',day:'numeric'});
   buildColorPick();
+  // Partenaire sees only Carte page
+  if(isPartenaire()){
+    ['ni-dash','ni-groups','ni-conso','ni-budgets','ni-plans','ni-history'].forEach(id=>{
+      const el=document.getElementById(id);if(el)el.style.display='none';
+    });
+    nav('carte');
+  } else {
+    const niCarte=document.getElementById('ni-carte');
+    if(niCarte) niCarte.style.display=isAdmin()?'':'none';
+  }
+  const btnC=document.getElementById('btnAddCarte');
+  if(btnC) btnC.style.display=canSeeCarte()?'':'none';
 }
 
 function buildColorPick(){
@@ -796,7 +863,7 @@ function nav(name){
   document.querySelectorAll('.page').forEach(p=>p.classList.remove('on'));
   document.getElementById('ni-'+name).classList.add('on');
   document.getElementById('P_'+name).classList.add('on');
-  ({dash:renderDash,groups:renderGroups,conso:renderConso,budgets:renderBudgets,plans:renderPlans,history:renderHistory})[name]?.();
+  ({dash:renderDash,groups:renderGroups,conso:renderConso,budgets:renderBudgets,plans:renderPlans,carte:renderCarte,history:renderHistory})[name]?.();
 }
 
 function renderAll(){populateF();renderDash();}
@@ -1214,6 +1281,9 @@ async function confirmDel(){
     const p=db.plans.find(x=>x.id===pDelId);
     log({type:'st',grp:gName(p?.groupId),client:p?.client,desc:'Plan média supprimé'});
     db.plans=db.plans.filter(x=>x.id!==pDelId);
+  }else if(pDelType==='carte'){
+    db.carte=(db.carte||[]).filter(x=>x.id!==pDelId);
+    log({type:'st',grp:'Carte',desc:'Débit carte supprimé'});
   }
   await save();closeM('M_del');populateF();renderGroups();renderBudgets();renderDash();
 }
@@ -1643,6 +1713,74 @@ async function removePost(budId,idx){
   renderDash();
 }
 
+// ── CARTE PARTENAIRE ──────────────────────────────────────────────────
+function isPartenaire(){ return role==='partenaire'; }
+function canSeeCarte(){ return role==='admin'||role==='partenaire'; }
+
+function renderCarte(){
+  if(!canSeeCarte()){ document.getElementById('P_carte').innerHTML='<div class="empty"><div class="ei">🔒</div><div class="et">Accès restreint</div></div>'; return; }
+  const entries=db.carte||[];
+  const totalMAD=entries.reduce((s,e)=>s+e.mad,0);
+  const totalEUR=entries.reduce((s,e)=>s+e.eur,0);
+  const thisMonth=new Date().toISOString().slice(0,7);
+  const monthEntries=entries.filter(e=>e.date&&e.date.startsWith(thisMonth));
+  const monthMAD=monthEntries.reduce((s,e)=>s+e.mad,0);
+
+  document.getElementById('carteKpis').innerHTML=`
+    <div class="kpi hl"><div class="kpi-l">Total débité (MAD)</div><div class="kpi-v">${fmt(totalMAD)}</div><div class="kpi-s">${entries.length} opération(s)</div></div>
+    <div class="kpi"><div class="kpi-l">Total débité (€)</div><div class="kpi-v" style="color:var(--amb)">${Math.round(totalEUR).toLocaleString('fr-MA')} €</div></div>
+    <div class="kpi"><div class="kpi-l">Ce mois</div><div class="kpi-v" style="color:var(--blu)">${fmt(monthMAD)}</div><div class="kpi-s">${monthEntries.length} opération(s)</div></div>
+  `;
+
+  const tb=document.getElementById('carteTbody');
+  const sorted=[...entries].sort((a,b)=>new Date(b.date)-new Date(a.date));
+  if(!sorted.length){
+    tb.innerHTML=`<tr><td colspan="7"><div class="empty"><div class="ei">◻</div><div class="et">Aucun débit enregistré</div><div class="es">Clique sur + Débit carte pour commencer</div></div></td></tr>`;
+    return;
+  }
+  tb.innerHTML=sorted.map(e=>`<tr>
+    <td class="mono tdim">${fD(e.date)}</td>
+    <td style="font-weight:500">${e.client||'—'}</td>
+    <td class="mono" style="color:var(--red)">−${fmt(e.mad)}</td>
+    <td class="mono tdim">${Math.round(e.eur).toLocaleString('fr-MA')} €</td>
+    <td class="dim" style="font-size:12px">${e.note||'—'}</td>
+    <td class="mono tdim" style="font-size:11px">${e.by||'—'}</td>
+    <td>${isAdmin()?`<button class="btn btn-xs btn-red" onclick="askDel('carte','${e.id}')">✕</button>`:''}</td>
+  </tr>`).join('');
+}
+
+function openCarteModal(){
+  document.getElementById('fCarteDate').value=new Date().toISOString().split('T')[0];
+  document.getElementById('fCarteMAD').value='';
+  document.getElementById('fCarteEUR').value='';
+  document.getElementById('fCarteClient').value='';
+  document.getElementById('fCarteNote').value='';
+  document.getElementById('fCarteTaux').value='10.8';
+  openM('M_carte');
+}
+
+function calcCarteEur(){
+  const mad=parseFloat(document.getElementById('fCarteMAD').value)||0;
+  const taux=parseFloat(document.getElementById('fCarteTaux').value)||10.8;
+  document.getElementById('fCarteEUR').value=mad>0?Math.round(mad/taux*100)/100:'';
+}
+
+async function saveCarte(){
+  const mad=parseFloat(document.getElementById('fCarteMAD').value)||0;
+  const taux=parseFloat(document.getElementById('fCarteTaux').value)||10.8;
+  const eur=mad>0?Math.round(mad/taux*100)/100:0;
+  const date=document.getElementById('fCarteDate').value;
+  const client=document.getElementById('fCarteClient').value;
+  const note=document.getElementById('fCarteNote').value;
+  if(!mad)return alert('Montant requis');
+  if(!db.carte)db.carte=[];
+  db.carte.push({id:uid(),mad,eur,taux,date,client,note,by:user,addedAt:now()});
+  log({type:'db',grp:'Carte',client,desc:`Débit carte — ${client||note||''}`,amount:mad,dir:'−'});
+  await save();
+  closeM('M_carte');
+  renderCarte();
+}
+
 function openM(id){document.getElementById(id).classList.add('on');}
 function closeM(id){document.getElementById(id).classList.remove('on');}
 document.querySelectorAll('.ov').forEach(o=>{o.addEventListener('click',e=>{if(e.target===o)o.classList.remove('on');});});
@@ -1674,6 +1812,7 @@ function getPMLineBadge(pmLineId){
     document.getElementById('S_app').classList.add('on');
     setupUI();
     renderAll();
+    if(role==='partenaire') nav('carte');
   }catch(e){
     localStorage.removeItem('declic_session');
   }
