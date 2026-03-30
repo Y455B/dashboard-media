@@ -207,7 +207,6 @@ tr:hover td{background:var(--s2)}
   .cc-stats{grid-template-columns:1fr 1fr}
 }
 </style>
-<script src="https://cdn.jsdelivr.net/npm/xlsx@0.18.5/dist/xlsx.full.min.js"></script>
 </head>
 <body>
 
@@ -1433,34 +1432,6 @@ function getPMLineBadge(pmLineId){
     <span style="background:var(--blu2);color:var(--blu);border:1px solid rgba(91,156,246,.2);border-radius:100px;padding:2px 10px;font-family:var(--mono);font-size:11px">${plan.client} · ${plan.period||'—'} — ${line.canal} (${fmt(line.budget)})</span>
   </div>`;
 }
-
-let pendingLinkBudId=null;
-function openLinkPMModal(budId){
-  pendingLinkBudId=budId;
-  const b=db.budgets.find(x=>x.id===budId);
-  const sel=document.getElementById('fLinkPM');
-  const lines=[];
-  (db.plans||[]).forEach(p=>{
-    if(p.client===b.client||true){
-      p.lines.forEach((l,i)=>{
-        lines.push({val:`${p.id}__${i}`,label:`${p.client} · ${p.period||'—'} — ${l.canal} (${fmt(l.budget)})`});
-      });
-    }
-  });
-  sel.innerHTML=`<option value="">— Aucune —</option>`+lines.map(l=>`<option value="${l.val}"${b.pmLineId===l.val?' selected':''}>${l.label}</option>`).join('');
-  document.getElementById('mLinkDesc').textContent=`${b.client} — ${b.canal}${b.period?' ['+b.period+']':''}`;
-  openM('M_link');
-}
-function saveLinkPM(){
-  const b=db.budgets.find(x=>x.id===pendingLinkBudId);
-  b.pmLineId=document.getElementById('fLinkPM').value;
-  log({type:'st',grp:gName(b.groupId),client:b.client,desc:`Lien PM mis à jour — ${b.canal}`});
-  save();closeM('M_link');renderConso();
-}
-
-function openM(id){document.getElementById(id).classList.add('on');}
-function closeM(id){document.getElementById(id).classList.remove('on');}
-document.querySelectorAll('.ov').forEach(o=>{o.addEventListener('click',e=>{if(e.target===o)o.classList.remove('on');});});
 
 (async function(){
   try{
