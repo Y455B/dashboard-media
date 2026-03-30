@@ -371,6 +371,7 @@ tr:hover td{background:var(--s2)}
         <div class="ph-r">
           <button class="btn btn-ghost" id="btnAddEnv" onclick="openEnvModal()">+ Enveloppe</button>
           <button class="btn btn-acc" id="btnAddCarte" onclick="openCarteModal()">+ Débit</button>
+          <button class="btn btn-ghost btn-sm" id="btnResetCarte" onclick="resetCarteData()" style="color:var(--red);border-color:rgba(240,96,96,.3)">Réinitialiser</button>
         </div>
       </div>
       <div class="kpi-row" id="carteKpis"></div>
@@ -884,6 +885,8 @@ function setupUI(){
   if(btnC) btnC.style.display=canSeeCarte()?'':'none';
   const btnE=document.getElementById('btnAddEnv');
   if(btnE) btnE.style.display=canSeeCarte()?'':'none';
+  const btnReset=document.getElementById('btnResetCarte');
+  if(btnReset) btnReset.style.display=isAdmin()?'':'none';
 }
 
 function buildColorPick(){
@@ -1301,7 +1304,9 @@ function askDel(type,id){
   const msgs={
     group:()=>{const g=db.groups.find(x=>x.id===id);return`Supprimer le groupe "${g?.name}" ? Tous les dossiers liés seront supprimés.`;},
     budget:()=>{const b=db.budgets.find(x=>x.id===id);return`Supprimer le dossier "${b?.client} — ${b?.canal}" ?`;},
-    plan:()=>{const p=db.plans.find(x=>x.id===id);return`Supprimer le plan média "${p?.client} — ${p?.period}" ?`;}
+    plan:()=>{const p=db.plans.find(x=>x.id===id);return`Supprimer le plan média "${p?.client} — ${p?.period}" ?`;},
+    carte:()=>{const d=(db.carte||[]).find(x=>x.id===id);return`Supprimer ce débit de ${d?.usdt||0} USDT ?`;},
+    envelope:()=>{const e=(db.envelopes||[]).find(x=>x.id===id);return`Supprimer cette enveloppe de ${e?.usdt||0} USDT et tous ses débits ?`;}
   };
   document.getElementById('mDelDesc').textContent=msgs[type]();
   openM('M_del');
@@ -1917,6 +1922,14 @@ async function saveCarte(){
   log({type:'db',grp:'Carte',desc:`Débit carte — ${tag} — ${usdt} USDT → ${fmt(mad)}`,amount:usdt,dir:'−'});
   await save();
   closeM('M_carte');
+  renderCarte();
+}
+
+async function resetCarteData(){
+  if(!confirm('Réinitialiser toutes les données carte (enveloppes + débits) ? Cette action est irréversible.')) return;
+  db.carte=[];
+  db.envelopes=[];
+  await save();
   renderCarte();
 }
 
