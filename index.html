@@ -498,6 +498,7 @@ async function doLogin(){
   if(p===PWS[r]){
     e.style.display='none';role=r;
     user=r==='admin'?'Digital Lead':r==='traffic'?'Traffic':'Finance';
+    localStorage.setItem('declic_session',JSON.stringify({role:r,user:user}));
     await load();
     document.getElementById('S_login').classList.remove('on');
     document.getElementById('S_app').classList.add('on');
