@@ -898,17 +898,20 @@ document.querySelectorAll('.ov').forEach(o=>{o.addEventListener('click',e=>{if(e
 // Auto-restore session on refresh
 (async function(){
   const s=localStorage.getItem('declic_session');
-  if(s){
-    try{
-      const {role:r,user:u}=JSON.parse(s);
-      if(r&&PWS[r]){
-        role=r;user=u;
-        await load();
-        document.getElementById('S_login').classList.remove('on');
-        document.getElementById('S_app').classList.add('on');
-        setupUI();renderAll();
-      }
-    }catch(e){localStorage.removeItem('declic_session');}
+  if(!s)return;
+  try{
+    const parsed=JSON.parse(s);
+    if(!parsed||!parsed.role)return;
+    role=parsed.role;
+    user=parsed.user;
+    await load();
+    document.getElementById('S_login').classList.remove('on');
+    document.getElementById('S_app').classList.add('on');
+    setupUI();
+    renderAll();
+  }catch(e){
+    console.warn('Session restore failed',e);
+    localStorage.removeItem('declic_session');
   }
 })();
 </script>
