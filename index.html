@@ -307,7 +307,7 @@ tr:hover td{background:var(--s2)}
             <option value="approvisionne">Approvisionné</option>
             <option value="encours">En cours</option>
           </select>
-          <button class="btn btn-acc" id="btnAddConsoDoc" onclick="openBudModal()">+ Dossier</button>
+          <button class="btn btn-acc" id="btnAddConsoDoc" onclick="openNewConsoModal()">+ Nouvelle conso</button>
         </div>
       </div>
       <div id="consoList"></div>
@@ -589,6 +589,31 @@ tr:hover td{background:var(--s2)}
       </div>
     </div>
     <div class="mb" id="mPVBody"></div>
+  </div>
+</div>
+
+<!-- MODAL: Nouvelle conso -->
+<div class="ov" id="M_newconso">
+  <div class="modal">
+    <div class="mh"><h3>Nouvelle conso live</h3><button class="mhc" onclick="closeM('M_newconso')">×</button></div>
+    <div class="mb">
+      <p style="font-size:13px;color:var(--t2);margin-bottom:1.25rem">Sélectionne un dossier budget existant pour démarrer le tracking de ses campagnes.</p>
+      <div class="frow"><label>Groupe</label>
+        <select id="fNCGrp" onchange="updateNCBudgets()">
+          <option value="">— Sélectionner —</option>
+        </select>
+      </div>
+      <div class="frow"><label>Dossier budget</label>
+        <select id="fNCBud" onchange="showNCPreview()">
+          <option value="">— Sélectionner —</option>
+        </select>
+      </div>
+      <div class="calc-box" id="ncPreview" style="display:none;margin-top:8px"></div>
+    </div>
+    <div class="mf">
+      <button class="btn btn-ghost" onclick="closeM('M_newconso')">Annuler</button>
+      <button class="btn btn-acc" onclick="activateConsoLive()">Activer le tracking</button>
+    </div>
   </div>
 </div>
 
@@ -1489,6 +1514,61 @@ async function saveLinkPM(){
   b.pmLineId=document.getElementById('fLinkPM').value;
   log({type:'st',grp:gName(b.groupId),client:b.client,desc:`Lien PM mis à jour — ${b.canal}`});
   await save();closeM('M_link');renderConso();
+}
+
+// ── NOUVELLE CONSO LIVE ───────────────────────────────────────────────
+function openNewConsoModal(){
+  // Populate groups
+  const grpSel=document.getElementById('fNCGrp');
+  grpSel.innerHTML=`<option value="">— Sélectionner —</option>`+
+    db.groups.map(g=>`<option value="${g.id}">${g.name}</option>`).join('');
+  document.getElementById('fNCBud').innerHTML=`<option value="">— Sélectionner —</option>`;
+  document.getElementById('ncPreview').style.display='none';
+  openM('M_newconso');
+}
+
+function updateNCBudgets(){
+  const gid=document.getElementById('fNCGrp').value;
+  const buds=db.budgets.filter(b=>b.groupId===gid);
+  document.getElementById('fNCBud').innerHTML=
+    `<option value="">— Sélectionner —</option>`+
+    buds.map(b=>`<option value="${b.id}">${b.client} — ${b.canal}${b.period?' ['+b.period+']':''}</option>`).join('');
+  document.getElementById('ncPreview').style.display='none';
+}
+
+function showNCPreview(){
+  const bid=document.getElementById('fNCBud').value;
+  const box=document.getElementById('ncPreview');
+  if(!bid){box.style.display='none';return;}
+  const b=db.budgets.find(x=>x.id===bid);
+  if(!b){box.style.display='none';return;}
+  const bar=b.bareme||{};
+  const baremeStr=[bar.IN?`IN : <strong>${fmt(bar.IN)}</strong>`:'',bar.FB?`FB : <strong>${fmt(bar.FB)}</strong>`:''].filter(Boolean).join(' &nbsp;|&nbsp; ');
+  box.style.display='block';
+  box.innerHTML=`
+    <strong>${b.client}</strong> — ${b.canal}${b.period?' ['+b.period+']':''}<br>
+    Net carte : <strong style="color:var(--acc)">${fmt(b.netAmt)}</strong> &nbsp;|&nbsp; Statut : <strong>${SL[b.status]}</strong><br>
+    ${baremeStr?'Barème — '+baremeStr:'Aucun barème défini — tu pourras ajouter les posts manuellement'}
+  `;
+}
+
+async function activateConsoLive(){
+  const bid=document.getElementById('fNCBud').value;
+  if(!bid)return alert('Sélectionne un dossier budget');
+  const b=db.budgets.find(x=>x.id===bid);
+  if(!b)return;
+  // Set status to encours if not already active
+  if(b.status==='attente'||b.status==='incoming'){
+    b.status='approvisionne';
+    log({type:'st',grp:gName(b.groupId),client:b.client,desc:`Conso live activée — ${b.canal}${b.period?' ['+b.period+']':''}`});
+  }
+  if(!b.posts) b.posts=[];
+  await save();
+  closeM('M_newconso');
+  // Switch to conso view and filter to show this budget
+  document.getElementById('consoSF').value='active';
+  renderConso();
+  nav('conso');
 }
 
 // ── POSTS SPONSORISES ────────────────────────────────────────────────
