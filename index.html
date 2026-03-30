@@ -211,14 +211,19 @@ tr:hover td{background:var(--s2)}
       <h1 class="lb-h">Media<br/><b>Tracker</b></h1>
       <p class="lb-sub">Gestion des flux budgets & consos</p>
       <div class="fl"><label>Profil</label>
-        <select id="loginRole">
+        <select id="loginRole" name="role">
           <option value="admin">Admin — Digital Lead</option>
           <option value="traffic">Traffic Manager</option>
           <option value="finance">Finance (lecture seule)</option>
         </select>
       </div>
       <div class="fl"><label>Mot de passe</label>
-        <input type="password" id="loginPw" placeholder="••••••••"/>
+        <div style="position:relative">
+          <input type="password" id="loginPw" name="password" placeholder="••••••••" autocomplete="current-password" style="padding-right:42px"/>
+          <button type="button" id="eyeBtn" onclick="toggleEye()" style="position:absolute;right:0;top:0;height:100%;width:40px;background:none;border:none;cursor:pointer;color:var(--t3);font-size:16px;display:flex;align-items:center;justify-content:center" title="Afficher/masquer">
+            <svg id="eyeIcon" viewBox="0 0 20 20" fill="none" stroke="currentColor" stroke-width="1.5" width="18" height="18"><path d="M1 10s3.5-7 9-7 9 7 9 7-3.5 7-9 7-9-7-9-7z"/><circle cx="10" cy="10" r="3"/></svg>
+          </button>
+        </div>
         <div class="err" id="loginErr">Mot de passe incorrect</div>
       </div>
       <button class="btn btn-acc btn-full" onclick="doLogin()">Accéder →</button>
@@ -482,6 +487,15 @@ async function doLogin(){
   }else{e.style.display='block';}
 }
 document.getElementById('loginPw').addEventListener('keydown',e=>{if(e.key==='Enter')doLogin();});
+function toggleEye(){
+  const inp=document.getElementById('loginPw');
+  const ico=document.getElementById('eyeIcon');
+  const show=inp.type==='password';
+  inp.type=show?'text':'password';
+  ico.innerHTML=show
+    ?'<path d="M3 3l14 14M7.5 6.5A9 9 0 0 1 10 6c5.5 0 9 4 9 4s-1.3 2.3-3.5 4M12.5 13.5A3 3 0 0 1 7 10c0-.6.2-1.2.5-1.6"/><path d="M1 10s3.5-7 9-7"/>'
+    :'<path d="M1 10s3.5-7 9-7 9 7 9 7-3.5 7-9 7-9-7-9-7z"/><circle cx="10" cy="10" r="3"/>';
+}
 function doLogout(){
   document.getElementById('S_app').classList.remove('on');
   document.getElementById('S_login').classList.add('on');
