@@ -1091,7 +1091,6 @@ function renderConso(){
         <div class="mono tdim" style="font-size:11px;flex-shrink:0">${pct}% brûlé</div>
       </div>
       ${getPMLineBadge(b.pmLineId)}
-      ${isPostsCanal(b.pmLineId) ? `
       <div style="margin-top:12px;border-top:1px solid var(--b1);padding-top:10px">
         ${(b.bareme&&(b.bareme.IN||b.bareme.FB))?`<div style="font-family:var(--mono);font-size:10px;color:var(--t3);margin-bottom:8px">Barème — ${[b.bareme.IN?'IN : '+fmt(b.bareme.IN):'',b.bareme.FB?'FB : '+fmt(b.bareme.FB):''].filter(Boolean).join(' · ')}</div>`:''}
         <div style="display:flex;align-items:center;justify-content:space-between;margin-bottom:8px">
@@ -1117,7 +1116,7 @@ function renderConso(){
             </tr>`).join('')}
           </tbody>
         </table>` : '<div style="font-family:var(--mono);font-size:11px;color:var(--t3)">Aucun post — clique sur + Post pour commencer</div>'}
-      </div>` : ''}
+      </div>
     </div>`;
   }).join('');
 }
@@ -1376,7 +1375,7 @@ function openPlanView(id){
       <thead><tr>
         <th style="padding:8px;font-family:var(--mono);font-size:10px;color:var(--t3);text-align:left;border-bottom:1px solid var(--b1)">CANAL</th>
         <th style="padding:8px;font-family:var(--mono);font-size:10px;color:var(--t3);text-align:left;border-bottom:1px solid var(--b1)">BUDGET</th>
-        <th style="padding:8px;font-family:var(--mono);font-size:10px;color:var(--t3);text-align:left;border-bottom:1px solid var(--b1)">%</th>
+        <th style="padding:8px;font-family:var(--mono);font-size:10px;color:var(--t3);text-align:left;border-bottom:1px solid var(--b1)">% budget</th>
         <th style="padding:8px;font-family:var(--mono);font-size:10px;color:var(--t3);text-align:left;border-bottom:1px solid var(--b1)">OBJECTIF</th>
         <th style="padding:8px;font-family:var(--mono);font-size:10px;color:var(--t3);text-align:left;border-bottom:1px solid var(--b1)">KPI CIBLE</th>
         <th style="padding:8px;font-family:var(--mono);font-size:10px;color:var(--t3);text-align:left;border-bottom:1px solid var(--b1)">CIBLAGE</th>
