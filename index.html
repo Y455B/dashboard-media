@@ -963,16 +963,17 @@ function openBudModal(id){
     if(bIN) bIN.value=(b.bareme&&b.bareme.IN)||'';
     if(bFB) bFB.value=(b.bareme&&b.bareme.FB)||'';
     updateBudPMLines();
-    document.getElementById('fBPMLine').value=b.pmLineId||'';
+    const pmSel=document.getElementById('fBPMLine'); if(pmSel) pmSel.value=b.pmLineId||'';
     calcNet();
   }else{
-    ['fBD','fBP','fBN'].forEach(id=>document.getElementById(id).value='');
+    ['fBD','fBP','fBN','fBBaremeIN','fBBaremeFB'].forEach(id=>{const el=document.getElementById(id);if(el)el.value='';});
     document.getElementById('fBF').value='0';
     document.getElementById('calcRes').textContent='Saisis le montant et les frais pour voir le net';
   }
   openM('M_bud');
 }
 async function saveBud(){
+  try{
   const groupId=document.getElementById('fBG').value;
   const client=document.getElementById('fBC').value;
   const canal=document.getElementById('fBCan').value;
@@ -997,6 +998,7 @@ async function saveBud(){
     log({type:'nw',grp:gName(groupId),client,desc:`Nouveau dossier — ${client} · ${canal} · ${period} · devis ${fmt(devis)} · net ${fmt(netAmt)}`});
   }
   await save();closeM('M_bud');populateF();renderBudgets();renderDash();
+  }catch(err){console.error('saveBud error:',err);alert('Erreur: '+err.message);}
 }
 function renderBudgets(){
   const gf=document.getElementById('budGF').value;
