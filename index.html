@@ -248,6 +248,10 @@ tr:hover td{background:var(--s2)}
     <div class="ni" id="ni-history" onclick="nav('history')"><svg viewBox="0 0 16 16" fill="none" stroke="currentColor" stroke-width="1.5"><path d="M2 8h12M8 2l6 6-6 6"/></svg>Historique</div>
     <div class="side-bot">
       <div class="side-user" id="sideUser"></div>
+      <div style="display:flex;align-items:center;gap:6px;margin-bottom:8px">
+        <span id="redisIndicator" style="width:7px;height:7px;border-radius:50%;background:var(--t3);flex-shrink:0"></span>
+        <span id="redisLabel" style="font-family:var(--mono);font-size:10px;color:var(--t3)">Redis…</span>
+      </div>
       <button class="btn btn-ghost btn-sm btn-full" onclick="doLogout()">Déconnexion</button>
     </div>
   </aside>
@@ -455,9 +459,23 @@ let isSaving=false;
 async function load(){
   try{
     const r=await fetch('/api/db?action=get&key='+REDIS_KEY);
+    if(!r.ok) throw new Error('HTTP '+r.status);
     const data=await r.json();
     if(data.value) db=data.value;
-  }catch(e){ console.warn('Redis load failed, using empty state',e); }
+    setRedisStatus(true);
+  }catch(e){
+    console.warn('Redis load failed',e);
+    setRedisStatus(false);
+  }
+}
+
+function setRedisStatus(ok){
+  const dot=document.getElementById('redisIndicator');
+  const lbl=document.getElementById('redisLabel');
+  if(!dot||!lbl)return;
+  dot.style.background=ok?'var(--grn)':'var(--red)';
+  lbl.style.color=ok?'var(--grn)':'var(--red)';
+  lbl.textContent=ok?'Redis connecté':'Redis offline';
 }
 
 async function save(){
@@ -497,6 +515,7 @@ function toggleEye(){
     :'<path d="M1 10s3.5-7 9-7 9 7 9 7-3.5 7-9 7-9-7-9-7z"/><circle cx="10" cy="10" r="3"/>';
 }
 function doLogout(){
+  localStorage.removeItem('declic_session');
   document.getElementById('S_app').classList.remove('on');
   document.getElementById('S_login').classList.add('on');
   document.getElementById('loginPw').value='';
@@ -875,6 +894,23 @@ function confirmDel(){
 function openM(id){document.getElementById(id).classList.add('on');}
 function closeM(id){document.getElementById(id).classList.remove('on');}
 document.querySelectorAll('.ov').forEach(o=>{o.addEventListener('click',e=>{if(e.target===o)o.classList.remove('on');});});
+
+// Auto-restore session on refresh
+(async function(){
+  const s=localStorage.getItem('declic_session');
+  if(s){
+    try{
+      const {role:r,user:u}=JSON.parse(s);
+      if(r&&PWS[r]){
+        role=r;user=u;
+        await load();
+        document.getElementById('S_login').classList.remove('on');
+        document.getElementById('S_app').classList.add('on');
+        setupUI();renderAll();
+      }
+    }catch(e){localStorage.removeItem('declic_session');}
+  }
+})();
 </script>
 </body>
 </html>
