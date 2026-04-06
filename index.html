@@ -4,6 +4,7 @@
 <meta charset="UTF-8"/>
 <meta name="viewport" content="width=device-width, initial-scale=1.0"/>
 <title>Déclic — Media Tracker</title>
+<link rel="icon" type="image/svg+xml" href="data:image/svg+xml;base64,PHN2ZyB4bWxucz0iaHR0cDovL3d3dy53My5vcmcvMjAwMC9zdmciIHZpZXdCb3g9IjAgMCAzMiAzMiI+CiAgPHJlY3Qgd2lkdGg9IjMyIiBoZWlnaHQ9IjMyIiByeD0iOCIgZmlsbD0iI2M4ZjA2MCIvPgogIDx0ZXh0IHg9IjE2IiB5PSIyMyIgZm9udC1mYW1pbHk9IkFyaWFsIEJsYWNrLCBBcmlhbCwgc2Fucy1zZXJpZiIgZm9udC1zaXplPSIyMiIgZm9udC13ZWlnaHQ9IjkwMCIgZmlsbD0iIzBjMGMwYyIgdGV4dC1hbmNob3I9Im1pZGRsZSIgbGV0dGVyLXNwYWNpbmc9Ii0xIj5EPC90ZXh0Pgo8L3N2Zz4="/>
 <link rel="preconnect" href="https://fonts.googleapis.com"/>
 <link href="https://fonts.googleapis.com/css2?family=DM+Mono:wght@400;500&family=Sora:wght@300;400;500;600&display=swap" rel="stylesheet"/>
 <style>
@@ -218,7 +219,13 @@ tr:hover td{background:var(--s2)}
 <div id="S_login" class="screen on">
   <div class="lp">
     <div class="lb">
-      <div class="lb-logo">Déclic <em>//</em> Media</div>
+      <div style="display:flex;align-items:center;gap:10px;margin-bottom:3rem">
+        <svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 32 32" width="36" height="36" style="flex-shrink:0;border-radius:9px">
+          <rect width="32" height="32" rx="8" fill="#c8f060"/>
+          <text x="16" y="23" font-family="Arial Black, Arial, sans-serif" font-size="22" font-weight="900" fill="#0c0c0c" text-anchor="middle" letter-spacing="-1">D</text>
+        </svg>
+        <div class="lb-logo" style="margin-bottom:0">Déclic <em>//</em> Media</div>
+      </div>
       <h1 class="lb-h">Media<br/><b>Tracker</b></h1>
       <p class="lb-sub">Gestion des flux budgets & consos</p>
       <div id="loginForm">
@@ -250,7 +257,13 @@ tr:hover td{background:var(--s2)}
 <div class="shell">
   <aside class="side">
     <div class="side-top">
-      <div class="side-brand">Déclic <em>//</em> Media</div>
+      <div style="display:flex;align-items:center;gap:10px">
+        <svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 32 32" width="28" height="28" style="flex-shrink:0;border-radius:7px">
+          <rect width="32" height="32" rx="8" fill="#c8f060"/>
+          <text x="16" y="23" font-family="Arial Black, Arial, sans-serif" font-size="22" font-weight="900" fill="#0c0c0c" text-anchor="middle" letter-spacing="-1">D</text>
+        </svg>
+        <div class="side-brand">Déclic <em>//</em> Media</div>
+      </div>
       <div id="sideBadge" class="role-badge"></div>
     </div>
     <div class="ns">Suivi</div>
