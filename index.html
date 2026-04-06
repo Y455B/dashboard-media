@@ -1912,5 +1912,29 @@ async function resetCarteData(){
   db.carte=[]; db.envelopes=[];
   await save(); renderCarte();
 }
+function openM(id){document.getElementById(id).classList.add('on');}
+function closeM(id){document.getElementById(id).classList.remove('on');}
+document.querySelectorAll('.ov').forEach(o=>{o.addEventListener('click',e=>{if(e.target===o)o.classList.remove('on');});});
 
-
+(async function(){
+  try{
+    const s=localStorage.getItem('declic_session');
+    if(!s)return;
+    const parsed=JSON.parse(s);
+    if(!parsed||!parsed.role)return;
+    role=parsed.role;
+    user=parsed.user;
+    await load();
+    document.getElementById('S_login').classList.remove('on');
+    document.getElementById('S_app').classList.add('on');
+    setupUI();
+    renderAll();
+    if(role==='partenaire') nav('carte');
+  }catch(e){
+    localStorage.removeItem('declic_session');
+  }
+})();
+</script>
+<script src="https://cdn.jsdelivr.net/npm/xlsx@0.18.5/dist/xlsx.full.min.js"></script>
+</body>
+</html>
