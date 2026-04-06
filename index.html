@@ -367,10 +367,9 @@ tr:hover td{background:var(--s2)}
     <!-- CARTE PARTENAIRE -->
     <div class="page" id="P_carte">
       <div class="ph">
-        <div class="ph-l"><h1>Carte partenaire</h1><p>Enveloppes & débits carte</p></div>
+        <div class="ph-l"><h1>Carte partenaire</h1><p>Alimentations & mouvements</p></div>
         <div class="ph-r">
-          <button class="btn btn-ghost" id="btnAddEnv" onclick="openEnvModal()">+ Enveloppe</button>
-          <button class="btn btn-acc" id="btnAddCarte" onclick="openCarteModal()">+ Débit</button>
+          <button class="btn btn-acc" id="btnAddEnv" onclick="openEnvModal()">+ Alimentation</button>
           <button class="btn btn-ghost btn-sm" id="btnResetCarte" onclick="resetCarteData()" style="color:var(--red);border-color:rgba(240,96,96,.3)">Réinitialiser</button>
         </div>
       </div>
@@ -615,29 +614,29 @@ tr:hover td{background:var(--s2)}
 <!-- MODAL: Enveloppe carte -->
 <div class="ov" id="M_env">
   <div class="modal">
-    <div class="mh"><h3>Nouvelle enveloppe</h3><button class="mhc" onclick="closeM('M_env')">×</button></div>
+    <div class="mh"><h3>Nouvelle alimentation</h3><button class="mhc" onclick="closeM('M_env')">×</button></div>
     <div class="mb">
       <div class="fg">
-        <div class="frow"><label>Date d'appro</label>
+        <div class="frow"><label>Date</label>
           <input type="date" id="fEnvDate"/>
         </div>
-        <div class="frow"><label>Montant approvisionné (USDT)</label>
-          <input type="number" id="fEnvUSDT" placeholder="50 000" oninput="calcEnvMAD()"/>
+        <div class="frow"><label>Solde initial (USDT)</label>
+          <input type="number" id="fEnvUSDT" placeholder="5 000" oninput="calcEnvMAD()"/>
         </div>
-        <div class="frow"><label>Taux de change (MAD/USDT)</label>
+        <div class="frow"><label>Taux (MAD/USDT)</label>
           <input type="number" id="fEnvTaux" placeholder="10.8" step="0.01" value="10.8" oninput="calcEnvMAD()"/>
         </div>
         <div class="frow"><label>Équivalent (MAD)</label>
-          <input type="number" id="fEnvMAD" placeholder="calculé auto" readonly style="opacity:.6"/>
+          <input type="number" id="fEnvMAD" readonly style="opacity:.6"/>
         </div>
         <div class="fc frow"><label>Note (optionnel)</label>
-          <input id="fEnvNote" placeholder="Référence virement, banque…"/>
+          <input id="fEnvNote" placeholder="Référence, banque…"/>
         </div>
       </div>
     </div>
     <div class="mf">
       <button class="btn btn-ghost" onclick="closeM('M_env')">Annuler</button>
-      <button class="btn btn-acc" onclick="saveEnv()">Créer l'enveloppe</button>
+      <button class="btn btn-acc" onclick="saveEnv()">Créer</button>
     </div>
   </div>
 </div>
@@ -645,26 +644,21 @@ tr:hover td{background:var(--s2)}
 <!-- MODAL: Débit carte -->
 <div class="ov" id="M_carte">
   <div class="modal">
-    <div class="mh"><h3>Nouveau débit carte</h3><button class="mhc" onclick="closeM('M_carte')">×</button></div>
+    <div class="mh"><h3>Nouveau mouvement</h3><button class="mhc" onclick="closeM('M_carte')">×</button></div>
     <div class="mb">
-      <div class="frow fc" style="margin-bottom:12px"><label>Enveloppe</label>
-        <select id="fCarteEnv" onchange="updateCarteEnvInfo()">
-          <option value="">— Sélectionner une enveloppe —</option>
-        </select>
-        <div id="carteEnvInfo" style="font-family:var(--mono);font-size:11px;color:var(--t2);margin-top:6px"></div>
-      </div>
+      <div style="font-family:var(--mono);font-size:11px;color:var(--t2);margin-bottom:1rem" id="mCarteEnvInfo"></div>
       <div class="fg">
-        <div class="frow"><label>Date du débit</label>
+        <div class="frow"><label>Date</label>
           <input type="date" id="fCarteDate"/>
         </div>
-        <div class="frow"><label>Montant débité (USDT)</label>
+        <div class="frow"><label>Montant (USDT)</label>
           <input type="number" id="fCarteUSDT" placeholder="110" oninput="calcCarteUSDT()"/>
         </div>
-        <div class="frow"><label>Taux de change (MAD/USDT)</label>
-          <input type="number" id="fCarteTaux" placeholder="10.8" step="0.01" value="10.8" oninput="calcCarteUSDT()"/>
+        <div class="frow"><label>Taux (MAD/USDT)</label>
+          <input type="number" id="fCarteTaux" step="0.01" value="10.8" oninput="calcCarteUSDT()"/>
         </div>
         <div class="frow"><label>Équivalent (MAD)</label>
-          <input type="number" id="fCarteMAD2" placeholder="calculé auto" readonly style="opacity:.6"/>
+          <input type="number" id="fCarteMAD2" readonly style="opacity:.6"/>
         </div>
         <div class="fc frow"><label>Catégorie</label>
           <div style="display:flex;gap:8px;flex-wrap:wrap;margin-top:4px" id="carteTagPicker">
@@ -675,6 +669,9 @@ tr:hover td{background:var(--s2)}
             <button type="button" class="carte-tag" onclick="selectCarteTag(this,'Autre')">Autre</button>
           </div>
           <input type="hidden" id="fCarteTag" value=""/>
+        </div>
+        <div class="fc frow"><label>Note (optionnel)</label>
+          <input id="fCarteNote2" placeholder="Détail du paiement…"/>
         </div>
       </div>
     </div>
@@ -881,12 +878,9 @@ function setupUI(){
     const niCarte=document.getElementById('ni-carte');
     if(niCarte) niCarte.style.display=isAdmin()?'':'none';
   }
-  const btnC=document.getElementById('btnAddCarte');
-  if(btnC) btnC.style.display=canSeeCarte()?'':'none';
-  const btnE=document.getElementById('btnAddEnv');
-  if(btnE) btnE.style.display=canSeeCarte()?'':'none';
+  ['btnAddEnv','btnResetCarte'].forEach(id=>{const el=document.getElementById(id);if(el)el.style.display=canSeeCarte()?'':'none';});
   const btnReset=document.getElementById('btnResetCarte');
-  if(btnReset) btnReset.style.display=isAdmin()?'':'none';
+  if(btnReset)btnReset.style.display=isAdmin()?'':'none';
 }
 
 function buildColorPick(){
@@ -1767,75 +1761,80 @@ async function removePost(budId,idx){
 // ── CARTE PARTENAIRE ──────────────────────────────────────────────────
 function isPartenaire(){ return role==='partenaire'; }
 function canSeeCarte(){ return role==='admin'||role==='partenaire'; }
-
 function fmt2(n){ return (Math.round(n*100)/100).toLocaleString('fr-MA'); }
 
 function renderCarte(){
   if(!canSeeCarte()) return;
-  const envs=db.envelopes||[];
-  const debits=db.carte||[];
+  if(!db.envelopes) db.envelopes=[];
+  if(!db.carte) db.carte=[];
+  const envs=db.envelopes;
+  const all=db.carte;
+
   const totalUSDT=envs.reduce((s,e)=>s+e.usdt,0);
   const totalMAD=envs.reduce((s,e)=>s+e.mad,0);
-  const totalDebUSDT=debits.reduce((s,d)=>s+d.usdt,0);
-  const totalDebMAD=debits.reduce((s,d)=>s+d.mad,0);
-  const soldeUSDT=totalUSDT-totalDebUSDT;
-  const soldeMAD=totalMAD-totalDebMAD;
+  const usedUSDT=all.reduce((s,d)=>s+d.usdt,0);
+  const usedMAD=all.reduce((s,d)=>s+d.mad,0);
+  const soldeUSDT=totalUSDT-usedUSDT;
 
   document.getElementById('carteKpis').innerHTML=`
-    <div class="kpi hl"><div class="kpi-l">Total approvisionné</div><div class="kpi-v">${fmt2(totalUSDT)} USDT</div><div class="kpi-s">${fmt(totalMAD)}</div></div>
-    <div class="kpi"><div class="kpi-l">Total débité</div><div class="kpi-v" style="color:var(--red)">${fmt2(totalDebUSDT)} USDT</div><div class="kpi-s">${fmt(totalDebMAD)}</div></div>
-    <div class="kpi"><div class="kpi-l">Solde disponible</div><div class="kpi-v" style="color:${soldeUSDT<0?'var(--red)':'var(--grn)'}">${fmt2(soldeUSDT)} USDT</div><div class="kpi-s">${fmt(soldeMAD)}</div></div>
-    <div class="kpi"><div class="kpi-l">Enveloppes</div><div class="kpi-v" style="color:var(--blu)">${envs.length}</div><div class="kpi-s">${debits.length} débit(s)</div></div>
+    <div class="kpi hl"><div class="kpi-l">Total alimenté</div><div class="kpi-v">${fmt2(totalUSDT)} USDT</div><div class="kpi-s">${fmt(totalMAD)}</div></div>
+    <div class="kpi"><div class="kpi-l">Total dépensé</div><div class="kpi-v" style="color:var(--red)">${fmt2(usedUSDT)} USDT</div><div class="kpi-s">${fmt(usedMAD)}</div></div>
+    <div class="kpi"><div class="kpi-l">Solde global</div><div class="kpi-v" style="color:${soldeUSDT<0?'var(--red)':'var(--grn)'}">${fmt2(soldeUSDT)} USDT</div><div class="kpi-s">${fmt(totalMAD-usedMAD)}</div></div>
   `;
 
   const el=document.getElementById('carteEnvList');
   if(!envs.length){
-    el.innerHTML=`<div class="empty"><div class="ei">◻</div><div class="et">Aucune enveloppe</div><div class="es">Crée une enveloppe avant d'enregistrer des débits</div></div>`;
+    el.innerHTML=`<div class="empty"><div class="ei">◻</div><div class="et">Aucune alimentation</div><div class="es">Crée une alimentation via le bouton + Alimentation</div></div>`;
     return;
   }
 
   el.innerHTML=[...envs].reverse().map(env=>{
-    const envDebits=debits.filter(d=>d.envId===env.id);
-    const debUSDT=envDebits.reduce((s,d)=>s+d.usdt,0);
-    const debMAD=envDebits.reduce((s,d)=>s+d.mad,0);
-    const solde=env.usdt-debUSDT;
-    const pct=env.usdt>0?Math.min(Math.round(debUSDT/env.usdt*100),100):0;
-    const delBtn=isAdmin()?`<button class="btn btn-xs btn-red" onclick="askDel('envelope','${env.id}')">Supprimer</button>`:'';
+    const mvts=all.filter(d=>d.envId===env.id);
+    const spent=mvts.reduce((s,d)=>s+d.usdt,0);
+    const spentMAD=mvts.reduce((s,d)=>s+d.mad,0);
+    const solde=env.usdt-spent;
+    const pct=env.usdt>0?Math.min(Math.round(spent/env.usdt*100),100):0;
+    const delEnv=isAdmin()?`<button class="btn btn-xs btn-red" onclick="askDel('envelope','${env.id}')">Supprimer</button>`:'';
     return `<div class="card" style="margin-bottom:1rem">
       <div style="display:flex;align-items:center;justify-content:space-between;padding:1rem 1.25rem;border-bottom:1px solid var(--b1);gap:1rem;flex-wrap:wrap">
         <div>
-          <div style="font-size:14px;font-weight:500">Enveloppe — ${fmt2(env.usdt)} USDT <span style="font-family:var(--mono);font-size:11px;color:var(--t2)">(${fmt(env.mad)})</span></div>
-          <div style="font-family:var(--mono);font-size:11px;color:var(--t2);margin-top:3px">Appro le ${fD(env.date)}${env.note?' · '+env.note:''} · Taux : ${env.taux} MAD/USDT</div>
+          <div style="font-size:14px;font-weight:500">Alimentation — <span style="color:var(--acc)">${fmt2(env.usdt)} USDT</span> <span style="font-family:var(--mono);font-size:11px;color:var(--t2)">(${fmt(env.mad)})</span></div>
+          <div style="font-family:var(--mono);font-size:11px;color:var(--t2);margin-top:3px">${fD(env.date)}${env.note?' · '+env.note:''} · Taux ${env.taux} MAD/USDT</div>
         </div>
-        <div style="display:flex;align-items:center;gap:8px">
-          <span style="font-family:var(--mono);font-size:12px;color:${solde<0?'var(--red)':'var(--grn)'}">Solde : ${fmt2(solde)} USDT</span>
-          ${delBtn}
+        <div style="display:flex;align-items:center;gap:12px">
+          <div style="text-align:right">
+            <div style="font-family:var(--mono);font-size:13px;font-weight:500;color:${solde<0?'var(--red)':'var(--grn)'}">${fmt2(solde)} USDT</div>
+            <div style="font-family:var(--mono);font-size:10px;color:var(--t3)">solde restant</div>
+          </div>
+          <button class="btn btn-xs btn-ghost" onclick="openCarteModal('${env.id}')">+ Mouvement</button>
+          ${delEnv}
         </div>
       </div>
-      <div style="padding:.875rem 1.25rem;border-bottom:1px solid var(--b1)">
-        <div style="display:flex;justify-content:space-between;font-family:var(--mono);font-size:11px;color:var(--t3);margin-bottom:5px">
-          <span>${pct}% utilisé — ${fmt2(debUSDT)} USDT débités</span>
-          <span>${fmt2(env.usdt-debUSDT)} USDT restants</span>
+      <div style="padding:.75rem 1.25rem;border-bottom:1px solid var(--b1)">
+        <div style="display:flex;justify-content:space-between;font-family:var(--mono);font-size:10px;color:var(--t3);margin-bottom:4px">
+          <span>${fmt2(spent)} USDT dépensés (${pct}%)</span>
+          <span>${fmt2(solde)} restants</span>
         </div>
         <div class="prg"><div class="prg-f" style="width:${pct}%;background:${pct>80?'var(--red)':pct>50?'var(--amb)':'var(--grn)'}"></div></div>
       </div>
-      ${envDebits.length?`<div class="tbl-wrap"><table><thead><tr>
-        <th>Date</th><th>Catégorie</th><th>USDT</th><th>MAD</th><th>Saisi par</th><th></th>
+      ${mvts.length?`<div class="tbl-wrap"><table><thead><tr>
+        <th>Date</th><th>Catégorie</th><th>USDT</th><th>MAD</th><th>Note</th><th>Par</th><th></th>
       </tr></thead><tbody>
-        ${[...envDebits].reverse().map(d=>`<tr>
+        ${[...mvts].reverse().map(d=>`<tr>
           <td class="mono tdim">${fD(d.date)}</td>
           <td><span style="background:var(--amb2);color:var(--amb);border-radius:100px;padding:2px 10px;font-family:var(--mono);font-size:11px">${d.tag||'—'}</span></td>
           <td class="mono" style="color:var(--red)">−${fmt2(d.usdt)} USDT</td>
           <td class="mono tdim">${fmt(d.mad)}</td>
+          <td class="dim" style="font-size:12px">${d.note||'—'}</td>
           <td class="mono tdim" style="font-size:11px">${d.by||'—'}</td>
           <td>${isAdmin()?`<button class="btn btn-xs btn-red" onclick="askDel('carte','${d.id}')">✕</button>`:''}</td>
         </tr>`).join('')}
-      </tbody></table></div>`:`<div style="padding:1rem 1.25rem;font-family:var(--mono);font-size:12px;color:var(--t3)">Aucun débit sur cette enveloppe</div>`}
+      </tbody></table></div>`:`<div style="padding:1rem 1.25rem;font-family:var(--mono);font-size:12px;color:var(--t3)">Aucun mouvement — clique sur + Mouvement</div>`}
     </div>`;
   }).join('');
 }
 
-// Envelope modal
+// Envelope
 function openEnvModal(){
   document.getElementById('fEnvDate').value=new Date().toISOString().split('T')[0];
   document.getElementById('fEnvUSDT').value='';
@@ -1845,9 +1844,9 @@ function openEnvModal(){
   openM('M_env');
 }
 function calcEnvMAD(){
-  const usdt=parseFloat(document.getElementById('fEnvUSDT').value)||0;
-  const taux=parseFloat(document.getElementById('fEnvTaux').value)||10.8;
-  document.getElementById('fEnvMAD').value=usdt>0?Math.round(usdt*taux):'';
+  const u=parseFloat(document.getElementById('fEnvUSDT').value)||0;
+  const t=parseFloat(document.getElementById('fEnvTaux').value)||10.8;
+  document.getElementById('fEnvMAD').value=u>0?Math.round(u*t):'';
 }
 async function saveEnv(){
   const usdt=parseFloat(document.getElementById('fEnvUSDT').value)||0;
@@ -1855,121 +1854,63 @@ async function saveEnv(){
   const mad=usdt>0?Math.round(usdt*taux):0;
   const date=document.getElementById('fEnvDate').value;
   const note=document.getElementById('fEnvNote').value;
-  if(!usdt)return alert('Montant requis');
-  if(!db.envelopes)db.envelopes=[];
+  if(!usdt) return alert('Montant requis');
+  if(!db.envelopes) db.envelopes=[];
   db.envelopes.push({id:uid(),usdt,mad,taux,date,note,by:user,createdAt:now()});
-  log({type:'cr',grp:'Carte',desc:`Enveloppe créée — ${fmt2(usdt)} USDT (${fmt(mad)})`,amount:usdt,dir:'+'});
-  await save();
-  closeM('M_env');
-  renderCarte();
+  log({type:'cr',grp:'Carte',desc:`Alimentation — ${fmt2(usdt)} USDT (${fmt(mad)})`,amount:usdt,dir:'+'});
+  await save(); closeM('M_env'); renderCarte();
 }
 
-function openCarteModal(){
-  const envSel=document.getElementById('fCarteEnv');
-  const envs=db.envelopes||[];
-  envSel.innerHTML=`<option value="">— Sélectionner une enveloppe —</option>`+
-    [...envs].reverse().map(e=>{
-      const used=( db.carte||[]).filter(d=>d.envId===e.id).reduce((s,d)=>s+d.usdt,0);
-      const left=e.usdt-used;
-      return`<option value="${e.id}">${fD(e.date)} — ${fmt2(e.usdt)} USDT (solde: ${fmt2(left)} USDT)</option>`;
-    }).join('');
-  document.getElementById('carteEnvInfo').textContent='';
+// Mouvement
+let currentEnvId=null;
+function openCarteModal(envId){
+  currentEnvId=envId||null;
+  const env=envId?(db.envelopes||[]).find(e=>e.id===envId):null;
+  const info=document.getElementById('mCarteEnvInfo');
+  if(env){
+    const spent=(db.carte||[]).filter(d=>d.envId===envId).reduce((s,d)=>s+d.usdt,0);
+    info.innerHTML=`Alimentation ${fD(env.date)} — Solde : <strong style="color:var(--grn)">${fmt2(env.usdt-spent)} USDT</strong>`;
+    document.getElementById('fCarteTaux').value=env.taux;
+  } else {
+    info.textContent='';
+  }
   document.getElementById('fCarteDate').value=new Date().toISOString().split('T')[0];
   document.getElementById('fCarteUSDT').value='';
   document.getElementById('fCarteMAD2').value='';
-  document.getElementById('fCarteTaux').value='10.8';
   document.getElementById('fCarteTag').value='';
+  document.getElementById('fCarteNote2').value='';
   document.querySelectorAll('.carte-tag').forEach(b=>b.classList.remove('selected'));
   openM('M_carte');
 }
-
-function updateCarteEnvInfo(){
-  const envId=document.getElementById('fCarteEnv').value;
-  const info=document.getElementById('carteEnvInfo');
-  if(!envId){info.textContent='';return;}
-  const env=(db.envelopes||[]).find(e=>e.id===envId);
-  if(!env){info.textContent='';return;}
-  const used=(db.carte||[]).filter(d=>d.envId===envId).reduce((s,d)=>s+d.usdt,0);
-  const left=env.usdt-used;
-  info.innerHTML=`Taux : ${env.taux} MAD/USDT &nbsp;|&nbsp; Solde : <strong style="color:${left<0?'var(--red)':'var(--grn)'}">${fmt2(left)} USDT</strong>`;
-  // Auto-fill taux from envelope
-  document.getElementById('fCarteTaux').value=env.taux;
-  calcCarteUSDT();
+function calcCarteUSDT(){
+  const u=parseFloat(document.getElementById('fCarteUSDT').value)||0;
+  const t=parseFloat(document.getElementById('fCarteTaux').value)||10.8;
+  document.getElementById('fCarteMAD2').value=u>0?Math.round(u*t):'';
 }
-
-function selectCarteTag(btn, tag){
+function selectCarteTag(btn,tag){
   document.querySelectorAll('.carte-tag').forEach(b=>b.classList.remove('selected'));
   btn.classList.add('selected');
   document.getElementById('fCarteTag').value=tag;
 }
-
-function calcCarteUSDT(){
-  const usdt=parseFloat(document.getElementById('fCarteUSDT').value)||0;
-  const taux=parseFloat(document.getElementById('fCarteTaux').value)||10.8;
-  document.getElementById('fCarteMAD2').value=usdt>0?Math.round(usdt*taux):'';
-}
-
 async function saveCarte(){
   const usdt=parseFloat(document.getElementById('fCarteUSDT').value)||0;
   const taux=parseFloat(document.getElementById('fCarteTaux').value)||10.8;
   const mad=usdt>0?Math.round(usdt*taux):0;
   const date=document.getElementById('fCarteDate').value;
   const tag=document.getElementById('fCarteTag').value;
-  if(!usdt)return alert('Montant requis');
-  if(!tag)return alert('Sélectionne une catégorie');
-  if(!db.carte)db.carte=[];if(!db.envelopes)db.envelopes=[];
-  db.carte.push({id:uid(),mad,usdt,taux,date,tag,by:user,addedAt:now()});
-  log({type:'db',grp:'Carte',desc:`Débit carte — ${tag} — ${usdt} USDT → ${fmt(mad)}`,amount:usdt,dir:'−'});
-  await save();
-  closeM('M_carte');
-  renderCarte();
+  const note=document.getElementById('fCarteNote2').value;
+  if(!usdt) return alert('Montant requis');
+  if(!tag) return alert('Sélectionne une catégorie');
+  if(!currentEnvId) return alert('Ouvre ce formulaire depuis une enveloppe');
+  if(!db.carte) db.carte=[];
+  db.carte.push({id:uid(),envId:currentEnvId,usdt,mad,taux,date,tag,note,by:user,addedAt:now()});
+  log({type:'db',grp:'Carte',desc:`Mouvement — ${tag} — ${fmt2(usdt)} USDT`,amount:usdt,dir:'−'});
+  await save(); closeM('M_carte'); renderCarte();
 }
-
 async function resetCarteData(){
-  if(!confirm('Réinitialiser toutes les données carte (enveloppes + débits) ? Cette action est irréversible.')) return;
-  db.carte=[];
-  db.envelopes=[];
-  await save();
-  renderCarte();
+  if(!confirm('Réinitialiser toutes les données carte ? Cette action est irréversible.')) return;
+  db.carte=[]; db.envelopes=[];
+  await save(); renderCarte();
 }
 
-function openM(id){document.getElementById(id).classList.add('on');}
-function closeM(id){document.getElementById(id).classList.remove('on');}
-document.querySelectorAll('.ov').forEach(o=>{o.addEventListener('click',e=>{if(e.target===o)o.classList.remove('on');});});
 
-// PM LINE HELPERS
-function getPMLineBadge(pmLineId){
-  if(!pmLineId)return'';
-  const parts=pmLineId.split('__');
-  const plan=db.plans.find(p=>p.id===parts[0]);
-  if(!plan)return'';
-  const line=plan.lines[parseInt(parts[1])];
-  if(!line)return'';
-  return`<div style="margin-top:8px;display:flex;align-items:center;gap:6px">
-    <span style="font-family:var(--mono);font-size:10px;color:var(--t3);text-transform:uppercase;letter-spacing:.06em">PM lié</span>
-    <span style="background:var(--blu2);color:var(--blu);border:1px solid rgba(91,156,246,.2);border-radius:100px;padding:2px 10px;font-family:var(--mono);font-size:11px">${plan.client} · ${plan.period||'—'} — ${line.canal} (${fmt(line.budget)})</span>
-  </div>`;
-}
-
-(async function(){
-  try{
-    const s=localStorage.getItem('declic_session');
-    if(!s)return;
-    const parsed=JSON.parse(s);
-    if(!parsed||!parsed.role)return;
-    role=parsed.role;
-    user=parsed.user;
-    await load();
-    document.getElementById('S_login').classList.remove('on');
-    document.getElementById('S_app').classList.add('on');
-    setupUI();
-    renderAll();
-    if(role==='partenaire') nav('carte');
-  }catch(e){
-    localStorage.removeItem('declic_session');
-  }
-})();
-</script>
-<script src="https://cdn.jsdelivr.net/npm/xlsx@0.18.5/dist/xlsx.full.min.js"></script>
-</body>
-</html>
