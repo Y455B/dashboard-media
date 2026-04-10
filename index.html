@@ -828,41 +828,204 @@ let selColor=COLORS[0];
 
 const REDIS_KEY='declic_media_v4';
 let isSaving=false;
+let dbBaseline=null;              // last known server state (for 3-way merge)
+let lastSyncTs=0;
+let redisOk=true;
+let syncTimer=null;
+const SYNC_INTERVAL_MS=25000;     // auto-refresh every 25s
+const DB_COLLECTIONS=['groups','budgets','history','plans','carte','envelopes'];
+
+function _clone(x){return x==null?x:JSON.parse(JSON.stringify(x));}
+function _eq(a,b){return JSON.stringify(a)===JSON.stringify(b);}
+function _normalizeDb(d){
+  if(!d||typeof d!=='object')d={};
+  DB_COLLECTIONS.forEach(k=>{if(!Array.isArray(d[k]))d[k]=[];});
+  return d;
+}
+
+// ── 3-WAY MERGE (baseline / local / server) ──────────────────────────
+// Prevents "last-write-wins" overwrites when several users edit in parallel.
+function _mergeArrayById(baseArr,localArr,serverArr){
+  const b=new Map((baseArr||[]).map(x=>[x.id,x]));
+  const l=new Map((localArr||[]).map(x=>[x.id,x]));
+  const s=new Map((serverArr||[]).map(x=>[x.id,x]));
+  const out=[];
+  const seen=new Set();
+  // Keep local ordering as much as possible
+  for(const [id,litem] of l){
+    seen.add(id);
+    const bitem=b.get(id);
+    const sitem=s.get(id);
+    if(bitem&&_eq(litem,bitem)){
+      // no local change → take latest server version (if still there)
+      if(sitem)out.push(sitem);
+      // else: deleted remotely and untouched locally → drop
+    }else{
+      // local change OR local addition → local wins
+      out.push(litem);
+    }
+  }
+  // Append items that exist only on the server (added by someone else)
+  for(const [id,sitem] of s){
+    if(seen.has(id))continue;
+    if(b.has(id))continue; // deleted locally → respect deletion
+    out.push(sitem);
+  }
+  return out;
+}
+function _mergeHistory(baseArr,localArr,serverArr){
+  // Append-only log → union by signature
+  const sig=e=>`${e.ts||0}|${e.by||''}|${e.type||''}|${e.grp||''}|${e.client||''}|${e.desc||''}|${e.amount||''}|${e.dir||''}`;
+  const map=new Map();
+  (serverArr||[]).forEach(e=>map.set(sig(e),e));
+  (localArr||[]).forEach(e=>{if(!map.has(sig(e)))map.set(sig(e),e);});
+  return [...map.values()].sort((a,b)=>(a.ts||0)-(b.ts||0));
+}
+function mergeDb(baseline,local,server){
+  const base=_normalizeDb(_clone(baseline)||{});
+  const loc =_normalizeDb(_clone(local)   ||{});
+  const srv =_normalizeDb(_clone(server)  ||{});
+  return {
+    groups   :_mergeArrayById(base.groups,   loc.groups,   srv.groups),
+    budgets  :_mergeArrayById(base.budgets,  loc.budgets,  srv.budgets),
+    plans    :_mergeArrayById(base.plans,    loc.plans,    srv.plans),
+    carte    :_mergeArrayById(base.carte,    loc.carte,    srv.carte),
+    envelopes:_mergeArrayById(base.envelopes,loc.envelopes,srv.envelopes),
+    history  :_mergeHistory  (base.history,  loc.history,  srv.history)
+  };
+}
+
+async function _fetchServerDb(){
+  const r=await fetch('/api/db?action=get&key='+REDIS_KEY,{cache:'no-store'});
+  if(!r.ok)throw new Error('HTTP '+r.status);
+  const data=await r.json();
+  return data.value?_normalizeDb(data.value):null;
+}
 
 async function load(){
   try{
-    if(!db.plans)db.plans=[];
-    const r=await fetch('/api/db?action=get&key='+REDIS_KEY);
-    if(!r.ok) throw new Error('HTTP '+r.status);
-    const data=await r.json();
-    if(data.value){db=data.value;if(!db.plans)db.plans=[];if(!db.carte)db.carte=[];if(!db.envelopes)db.envelopes=[];}
+    const serverDb=await _fetchServerDb();
+    if(serverDb){
+      db=serverDb;
+    }else{
+      _normalizeDb(db);
+    }
+    dbBaseline=_clone(db);
+    setLastSync(Date.now());
     setRedisStatus(true);
   }catch(e){
     console.warn('Redis load failed',e);
+    _normalizeDb(db);
     setRedisStatus(false);
   }
 }
 
 function setRedisStatus(ok){
+  redisOk=ok;
   const dot=document.getElementById('redisIndicator');
   const lbl=document.getElementById('redisLabel');
   if(!dot||!lbl)return;
   dot.style.background=ok?'var(--grn)':'var(--red)';
   lbl.style.color=ok?'var(--grn)':'var(--red)';
-  lbl.textContent=ok?'Redis connecté':'Redis offline';
+  if(!ok){lbl.textContent='Redis offline';return;}
+  updateSyncLabel();
 }
+
+function setLastSync(ts){lastSyncTs=ts;updateSyncLabel();}
+
+function updateSyncLabel(){
+  if(!redisOk)return;
+  const lbl=document.getElementById('redisLabel');
+  if(!lbl)return;
+  if(!lastSyncTs){lbl.textContent='Redis connecté';return;}
+  const d=Math.max(0,Math.floor((Date.now()-lastSyncTs)/1000));
+  let rel;
+  if(d<5)      rel="synchro à l'instant";
+  else if(d<60)rel=`synchro il y a ${d}s`;
+  else if(d<3600)rel=`synchro il y a ${Math.floor(d/60)} min`;
+  else         rel=`synchro il y a ${Math.floor(d/3600)} h`;
+  lbl.textContent=rel;
+}
+setInterval(()=>{try{updateSyncLabel();}catch(e){}},5000);
 
 async function save(){
   if(isSaving)return;
   isSaving=true;
   try{
+    // 1. Read the freshest server state so we can merge on top of it
+    let serverDb=null;
+    try{serverDb=await _fetchServerDb();}catch(e){/* fallback to local-only below */}
+
+    // 2. Three-way merge (baseline / local / server). If no baseline yet
+    //    or first write, fall back to a plain write of the local db.
+    const merged=serverDb
+      ?mergeDb(dbBaseline||serverDb,db,serverDb)
+      :_clone(_normalizeDb(db));
+
+    // 3. Persist the merged result
     await fetch('/api/db',{
       method:'POST',
       headers:{'Content-Type':'application/json'},
-      body:JSON.stringify({action:'set',key:REDIS_KEY,value:db})
+      body:JSON.stringify({action:'set',key:REDIS_KEY,value:merged})
     });
-  }catch(e){ console.warn('Redis save failed',e); }
-  finally{ isSaving=false; }
+
+    // 4. Update local state + baseline so the next save merges from here
+    db=merged;
+    dbBaseline=_clone(merged);
+    setLastSync(Date.now());
+    setRedisStatus(true);
+  }catch(e){
+    console.warn('Redis save failed',e);
+    setRedisStatus(false);
+  }finally{
+    isSaving=false;
+  }
+}
+
+// ── AUTO-SYNC : poll every 25s + on tab refocus ───────────────────────
+function _anyModalOpen(){return !!document.querySelector('.ov.on');}
+function _currentPage(){
+  const el=document.querySelector('#S_app .page.on');
+  if(!el)return null;
+  return (el.id||'').replace(/^P_/,'')||null;
+}
+function _renderCurrentPage(){
+  const name=_currentPage();
+  const fn=({dash:renderDash,groups:renderGroups,conso:renderConso,budgets:renderBudgets,plans:renderPlans,carte:renderCarte,history:renderHistory})[name];
+  if(fn)try{fn();}catch(e){}
+}
+
+async function syncFromRemote(){
+  if(isSaving)return;              // a save is in flight, it already syncs
+  if(_anyModalOpen())return;       // don't clobber a form the user is filling
+  try{
+    const serverDb=await _fetchServerDb();
+    if(!serverDb){setRedisStatus(true);return;}
+    // Merge remote changes into our local view without losing unsaved edits
+    const merged=mergeDb(dbBaseline||serverDb,db,serverDb);
+    const changed=!_eq(merged,db);
+    db=merged;
+    dbBaseline=_clone(merged);
+    setLastSync(Date.now());
+    setRedisStatus(true);
+    if(changed){
+      try{populateF();}catch(e){}
+      try{renderDash();}catch(e){}
+      _renderCurrentPage();
+    }
+  }catch(e){
+    setRedisStatus(false);
+  }
+}
+
+function startAutoSync(){
+  if(syncTimer)return;
+  syncTimer=setInterval(syncFromRemote,SYNC_INTERVAL_MS);
+  window.addEventListener('focus',syncFromRemote);
+  document.addEventListener('visibilitychange',()=>{if(!document.hidden)syncFromRemote();});
+}
+function stopAutoSync(){
+  if(syncTimer){clearInterval(syncTimer);syncTimer=null;}
 }
 
 async function doLogin(){
@@ -879,6 +1042,7 @@ async function doLogin(){
     document.getElementById('S_app').classList.add('on');
     setupUI();
     renderAll();
+    startAutoSync();
   }else{
     errEl.style.display='block';
   }
@@ -893,6 +1057,7 @@ function toggleEye(){
     :'<path d="M1 10s3.5-7 9-7 9 7 9 7-3.5 7-9 7-9-7-9-7z"/><circle cx="10" cy="10" r="3"/>';
 }
 function doLogout(){
+  stopAutoSync();
   localStorage.removeItem('declic_session');
   document.getElementById('S_app').classList.remove('on');
   document.getElementById('S_login').classList.add('on');
@@ -2035,6 +2200,7 @@ document.querySelectorAll('.ov').forEach(o=>{o.addEventListener('click',e=>{if(e
     document.getElementById('S_app').classList.add('on');
     setupUI();
     renderAll();
+    startAutoSync();
     if(role==='partenaire') nav('carte');
   }catch(e){
     localStorage.removeItem('declic_session');
